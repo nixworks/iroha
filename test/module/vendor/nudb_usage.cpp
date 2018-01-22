@@ -47,22 +47,57 @@ TEST(NuDB, CRUD) {
   nudb::store db;
 
   db.open(dat_path, key_path, log_path, ec);
-  std::string data = "secret";
-  // Insert
-  for (key_type i = 0; i < N; ++i) db.insert(&i, data.data(), data.size(), ec);
-  // Fetch
-  for (key_type i = 0; i < N; ++i)
-    db.fetch(&i,
-             [&](void const *buffer, std::size_t size) {
-               ASSERT_EQ(size, data.size())
-                   << "write and read buffers sizes are different";
+  if (ec) {
+    FAIL() << "db can not be opened";
+  }
 
-               for (key_type j = 0; j < size; j++) {
-                 ASSERT_EQ(((char *)buffer)[j], data[j]);
-               }
+  std::string data = "secret";
+  {
+    // Insert
+    for (key_type i = 0; i < N; ++i) {
+      db.insert(&i, data.data(), data.size(), ec);
+      if (ec) {
+        FAIL() << "key i=" << i << " &i=" << &i << " can not be inserted";
+      }
+    }
+  }
+  {
+    // Fetch
+    for (key_type i = 0; i < N; ++i) {
+      db.fetch(&i,
+               [&](void const *buffer, std::size_t size) {
+                 ASSERT_EQ(size, data.size())
+                     << "write and read buffers sizes are different";
+
+                 for (key_type j = 0; j < size; j++) {
+                   ASSERT_EQ(((char *)buffer)[j], data[j]);
+                 }
+               },
+               ec);
+      if (ec) {
+        FAIL() << "key i=" << i << " &i=" << &i << " can not be fetched";
+      }
+    }
+  }
+
+  {
+    key_type a = 1337;
+    // try to read non-existent key
+    db.fetch(static_cast<const void*>(&a),
+             [](const void *p, size_t size) {
+               ASSERT_EQ(size, 0) << "size is " << size;
              },
              ec);
+    if (ec) {
+      FAIL() << "failed during reading of non-existent key";
+    }
+  }
+
   db.close(ec);
+  if (ec) {
+    FAIL() << "failed during closing of database";
+  }
+
   nudb::erase_file(dat_path);
   nudb::erase_file(key_path);
   nudb::erase_file(log_path);

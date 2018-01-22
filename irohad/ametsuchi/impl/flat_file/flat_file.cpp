@@ -29,11 +29,6 @@ using Identifier = FlatFile::Identifier;
 
 // ----------| public API |----------
 
-std::string FlatFile::id_to_name(Identifier id) {
-  std::ostringstream os;
-  os << std::setw(FlatFile::DIGIT_CAPACITY) << std::setfill('0') << id;
-  return os.str();
-}
 
 nonstd::optional<std::unique_ptr<FlatFile>> FlatFile::create(
     const std::string &path) {
