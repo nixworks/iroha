@@ -48,10 +48,10 @@ if (NOT nudb_FOUND)
 endif ()
 
 
-# TODO: potential bug: if Boost_USE_MULTITHREADED is ON, then should use boost_system-mt
+# TODO: potential bug: if Boost_USE_MULTITHREADED is ON, then list should have suffix -mt, e.g. boost_system-mt
 
 set_target_properties(nudb PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${nudb_INCLUDE_DIR}
-        INTERFACE_LINK_LIBRARIES "boost_system"
+        INTERFACE_LINK_LIBRARIES "boost_system;boost_thread-mt"
         )
 
