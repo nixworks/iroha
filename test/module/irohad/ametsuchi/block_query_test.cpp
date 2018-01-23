@@ -17,6 +17,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/optional.hpp>
+#include "ametsuchi/impl/block_storage_nudb.hpp"
 #include "ametsuchi/impl/redis_block_index.hpp"
 #include "ametsuchi/impl/redis_block_query.hpp"
 #include "framework/test_subscriber.hpp"
@@ -32,7 +33,7 @@ class BlockQueryTest : public AmetsuchiTest {
   void SetUp() override {
     AmetsuchiTest::SetUp();
 
-    auto tmp = FlatFile::create(block_store_path);
+    auto tmp = BlockStorage::create(block_store_path);
     ASSERT_TRUE(tmp);
     file = std::move(*tmp);
 
@@ -84,7 +85,7 @@ class BlockQueryTest : public AmetsuchiTest {
   std::vector<iroha::hash256_t> tx_hashes;
   std::shared_ptr<BlockQuery> blocks;
   std::shared_ptr<BlockIndex> index;
-  std::unique_ptr<FlatFile> file;
+  std::unique_ptr<BlockStorage> file;
   std::string creator1 = "user1@test";
   std::string creator2 = "user2@test";
   std::size_t blocks_total{0};
@@ -297,7 +298,8 @@ TEST_F(BlockQueryTest, GetBlockButItIsNotJSON) {
   size_t block_n = 1;
 
   // write something that is NOT JSON to block #1
-  auto block_path = fs::path{block_store_path} / FlatFile::id_to_name(block_n);
+  auto block_path =
+      fs::path{block_store_path} / BlockStorage::id_to_name(block_n);
   fs::ofstream block_file(block_path);
   std::string content = R"(this is definitely not json)";
   block_file << content;
@@ -322,7 +324,8 @@ TEST_F(BlockQueryTest, GetBlockButItIsInvalidBlock) {
   size_t block_n = 1;
 
   // write bad block instead of block #1
-  auto block_path = fs::path{block_store_path} / FlatFile::id_to_name(block_n);
+  auto block_path =
+      fs::path{block_store_path} / BlockStorage::id_to_name(block_n);
   fs::ofstream block_file(block_path);
   std::string content = R"({
   "testcase": [],

@@ -24,8 +24,8 @@
 namespace iroha {
   namespace ametsuchi {
 
-    using fs = boost::filesystem;
-    using sys = boost::system;
+    namespace fs = boost::filesystem;
+    namespace sys = boost::system;
     using Identifier = BlockStorage::Identifier;
 
     boost::optional<std::unique_ptr<BlockStorage>> BlockStorage::create(
@@ -74,7 +74,7 @@ namespace iroha {
 
       log_->info("database at {} successfully opened", path);
 
-      auto bs = std::make_unique<BlockStorage>();
+      auto bs = std::unique_ptr<BlockStorage>(new BlockStorage());
       bs->p_->init(std::move(db));
 
       // at this point database should be open
@@ -90,40 +90,15 @@ namespace iroha {
       return p_->get(id);
     }
 
-    boost::optional<Identifier> BlockStorage::last_id() const {
+    Identifier BlockStorage::last_id() const {
       return p_->last_id();
     }
 
-    boost::optional<Identifier> check_consistency(
-       const std::string &path){
-      auto log = logger::log("FLAT_FILE");
-
-      if (path.empty()) {
-        log->error("check_consistency({}), not directory", path);
-        return boost::none;
-      }
-
-      auto const files = [&path] {
-        std::vector<fs::path> ps;
-        std::copy(fs::directory_iterator{path},
-                  fs::directory_iterator{},
-                  std::back_inserter(ps));
-        std::sort(ps.begin(), ps.end(), std::less<fs::path>());
-        return ps;
-      }();
-
-      auto const missing = boost::range::find_if(
-          files | boost::adaptors::indexed(1), [](const auto &it) {
-            return BlockStorage::id_to_name(it.index()) != it.value().filename();
-          });
-
-      std::for_each(
-          missing.get(), files.cend(), [](const boost::filesystem::path &p) {
-            boost::filesystem::remove(p);
-          });
-
-      return missing.get() - files.cbegin();
+    bool BlockStorage::drop_all() {
+      return p_->drop_db();
     }
+
+    BlockStorage::BlockStorage() = default;
 
   }  // namespace ametsuchi
 }  // namespace iroha

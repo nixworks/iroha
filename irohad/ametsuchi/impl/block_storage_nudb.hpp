@@ -31,19 +31,17 @@ namespace iroha {
     void init(std::unique_ptr<nudb::store> db);
     bool add(Identifier id, const std::vector<uint8_t> &blob);
     boost::optional<std::vector<uint8_t>> get(Identifier id) const;
-    boost::optional<Identifier> last_id() const;
+    Identifier last_id() const;
     uint64_t total_blocks() const;
     bool drop_db();
 
     //< arbitrary number, app-specific
-    static const size_t appid_{1337u};
+    static constexpr size_t appid_{1337u};
     //< load factor for basket
-    static const float load_factor_{0.5f};
-
+    static constexpr float load_factor_{0.5f};
    private:
-    /** state **/
     //< total number of blocks in database
-    uint64_t total_blocks_{0};
+    uint32_t total_blocks_{0};
     std::unique_ptr<nudb::store> db_;
     logger::Logger log_;
   };

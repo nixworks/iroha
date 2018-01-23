@@ -20,18 +20,15 @@
 
 #include <cstdint>
 #include <boost/optional.hpp>
-
-namespace nudb {
-  class store;
-  class error_code;
-}
+#include <array>
+#include <nudb/nudb.hpp>
 
 namespace iroha {
   namespace ametsuchi {
 
-    uint64_t count_blocks(const nudb::store &db, nudb::error_code &ec);
+    uint32_t count_blocks(const nudb::store &db, nudb::error_code &ec);
 
-    const void *serialize_uint32(explicit uint32_t t);
+    std::array<uint8_t, sizeof(uint32_t)> serialize_uint32(uint32_t t);
 
     uint32_t deserialize_uint32(const void *p);
 

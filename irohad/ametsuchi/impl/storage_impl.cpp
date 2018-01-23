@@ -17,6 +17,7 @@
 
 #include "ametsuchi/impl/storage_impl.hpp"
 
+#include "ametsuchi/impl/block_storage_nudb.hpp"
 #include "ametsuchi/impl/mutable_storage_impl.hpp"
 #include "ametsuchi/impl/postgres_wsv_query.hpp"
 #include "ametsuchi/impl/redis_block_query.hpp"
@@ -36,7 +37,7 @@ namespace iroha {
         std::string redis_host,
         std::size_t redis_port,
         std::string postgres_options,
-        std::unique_ptr<FlatFile> block_store,
+        std::unique_ptr<BlockStorage> block_store,
         std::unique_ptr<cpp_redis::client> index,
         std::unique_ptr<pqxx::lazyconnection> wsv_connection,
         std::unique_ptr<pqxx::nontransaction> wsv_transaction)
@@ -171,7 +172,7 @@ DROP TABLE IF EXISTS role;
 
       // erase blocks
       log_->info("drop block store");
-      block_store_->dropAll();
+      block_store_->drop_all();
     }
 
     nonstd::optional<ConnectionContext> StorageImpl::initConnections(
@@ -182,7 +183,7 @@ DROP TABLE IF EXISTS role;
       auto log_ = logger::log("StorageImpl:initConnection");
       log_->info("Start storage creation");
 
-      auto block_store = FlatFile::create(block_store_dir);
+      auto block_store = BlockStorage::create(block_store_dir);
       if (not block_store) {
         log_->error("Cannot create block store in {}", block_store_dir);
         return nonstd::nullopt;

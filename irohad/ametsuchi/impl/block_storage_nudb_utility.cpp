@@ -16,7 +16,6 @@
  */
 
 #include "ametsuchi/impl/block_storage_nudb_utility.hpp"
-#include <nudb/nudb.hpp>
 #include "ametsuchi/impl/block_storage.hpp"
 
 namespace iroha {
@@ -29,21 +28,22 @@ namespace iroha {
       bool found_last = false;
 
       do {
-        db.fetch(serialize_uint32(current),
-                 [total, &found_last](const void *value, size_t size) {
-                   // if we read 0 bytes, then there is no such key
-                   if (size == 0u) {
-                     // if total=3, then current=3 will read 0 bytes, so
-                     // total=current here
-                     total = current;
-                     found_last = true;
-                     return;
-                   }
+        db.fetch(
+            serialize_uint32(current).data(),
+            [&total, &found_last, &current](const void *value, size_t size) {
+              // if we read 0 bytes, then there is no such key
+              if (size == 0u) {
+                // if total=3, then current=3 will read 0 bytes, so
+                // total=current here
+                total = current;
+                found_last = true;
+                return;
+              }
 
-                   // go to the next key
-                   current++;
-                 },
-                 ec);
+              // go to the next key
+              current++;
+            },
+            ec);
         if (ec) {
           // in case of error
           return 0;
@@ -53,8 +53,8 @@ namespace iroha {
       return total - BlockStorage::START_INDEX;
     }
 
-    const void *serialize_uint32(explicit uint32_t t) {
-      uint8_t b[sizeof(uint32_t)];
+    std::array<uint8_t, sizeof(uint32_t)> serialize_uint32(uint32_t t) {
+      std::array<uint8_t, sizeof(uint32_t)> b{};
 
       uint8_t i = 0;
       b[i++] = (t >> 24) & 0xFF;

@@ -27,8 +27,9 @@
 namespace iroha {
   namespace ametsuchi {
 
-    using fs = boost::filesystem;
-    using sys = boost::system;
+    namespace fs = boost::filesystem;
+    namespace sys = boost::system;
+    using Identifier = BlockStorage::Identifier ;
 
     std::string BlockStorage::id_to_name(Identifier id) {
       std::ostringstream os;
@@ -41,7 +42,9 @@ namespace iroha {
       log_ = logger::log("BlockStorage::Impl::init()");
 
       nudb::error_code ec;
-      total_blocks_ = count_blocks(*db_, ec);
+      total_blocks_ = count_blocks(*db_, ec);  // replaces check_consistency
+      // TODO(warchant): validate blocks during initialization
+
       if (ec) {
         log_->critical("can not read database to count blocks");
         // TODO(warchant): react somehow. exception?
@@ -51,7 +54,7 @@ namespace iroha {
     bool BlockStorage::Impl::add(Identifier id,
                                  const std::vector<uint8_t> &blob) {
       nudb::error_code ec;
-      db_->insert(serialize_uint32(id), blob.data(), blob.size(), ec);
+      db_->insert(serialize_uint32(id).data(), blob.data(), blob.size(), ec);
       return !ec;  // if ec is true, then add returns false (error happened!)
     }
 
@@ -59,12 +62,13 @@ namespace iroha {
         Identifier id) const {
       nudb::error_code ec;
       boost::optional<std::vector<uint8_t>> ret;
-      db_->fetch(serialize_uint32(id),
+      db_->fetch(serialize_uint32(id).data(),
                  [&ret](const void *p, size_t size) {
                    if (size == 0) {
                      ret = boost::none;
                    } else {
-                     ret = std::vector<uint8_t>{p, p + size};
+                     const auto *c = static_cast<const char *>(p);
+                     ret = std::vector<uint8_t>{c, c + size};
                    }
                  },
                  ec);
@@ -75,17 +79,37 @@ namespace iroha {
       return ret;
     }
 
-    boost::optional<Identifier> BlockStorage::Impl::last_id() const {
-      return total_blocks_ < START_INDEX ? boost::none
-                                         : total_blocks_ + START_INDEX;
+    Identifier BlockStorage::Impl::last_id() const {
+      if(total_blocks_ < BlockStorage::START_INDEX){
+        return 0; // = no blocks in storage
+      } else {
+        return total_blocks_ + BlockStorage::START_INDEX;
+      }
     }
 
     uint64_t BlockStorage::Impl::total_blocks() const {
       return total_blocks_;
     }
 
-    bool BlockStorage::Impl::drop_db(){
+    bool BlockStorage::Impl::drop_db() {
+      nudb::error_code ec;
 
+      nudb::erase_file(db_->dat_path(), ec);
+      if (ec) {
+        return false;
+      }
+
+      nudb::erase_file(db_->log_path(), ec);
+      if (ec) {
+        return false;
+      }
+
+      nudb::erase_file(db_->key_path(), ec);
+      if (ec) {
+        return false;
+      }
+
+      return true;
     }
 
   }  // namespace ametsuchi

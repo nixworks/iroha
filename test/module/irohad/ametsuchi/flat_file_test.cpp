@@ -18,7 +18,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
-#include "ametsuchi/impl/flat_file/flat_file.hpp"
+#include "ametsuchi/impl/block_storage.hpp"
 
 #include <gtest/gtest.h>
 #include "common/files.hpp"
@@ -27,7 +27,7 @@
 #include "logger/logger.hpp"
 
 using namespace iroha::ametsuchi;
-using Identifier = FlatFile::Identifier;
+using Identifier = BlockStorage::Identifier;
 
 static logger::Logger log_ = logger::testLog("BlockStore");
 
@@ -46,7 +46,7 @@ class BlStore_Test : public ::testing::Test {
 };
 
 TEST_F(BlStore_Test, Read_Write_Test) {
-  auto store = FlatFile::create(block_store_path);
+  auto store = BlockStorage::create(block_store_path);
   ASSERT_TRUE(store);
   auto bl_store = std::move(*store);
   auto id = 1u;
@@ -71,7 +71,7 @@ TEST_F(BlStore_Test, BlockStoreWhenRemoveBlock) {
         "----------| create blockstore and insert 3 elements "
         "|----------");
 
-    auto store = FlatFile::create(block_store_path);
+    auto store = BlockStorage::create(block_store_path);
     ASSERT_TRUE(store);
     auto bl_store = std::move(*store);
 

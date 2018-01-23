@@ -43,7 +43,7 @@ namespace iroha {
       /**
        * @brief block identifiers start with this number.
        */
-      static const Identifier START_INDEX{0u};
+      static const Identifier START_INDEX{1u};
 
       /**
        * Convert id to a string representation. The string representation is
@@ -84,23 +84,13 @@ namespace iroha {
       /**
        * @return maximal not null key
        */
-      boost::optional<Identifier> last_id() const;
-
-      /**
-       * Checking consistency of storage for provided folder
-       * If some block in the middle is missing all blocks following it are
-       * deleted
-       * @param dump_dir - folder of storage
-       * @return - last available identifier
-       */
-      static boost::optional<Identifier> check_consistency(
-          const std::string &dump_dir);
+      Identifier last_id() const;
 
       /**
        * @brief Clear database.
        * @return true, if success, false otherwise.
        */
-      bool dropAll();
+      bool drop_all();
 
       // ----------| modify operations |----------
 
@@ -110,7 +100,10 @@ namespace iroha {
       BlockStorage &operator=(BlockStorage &&rhs) = delete;
 
      private:
+      BlockStorage();
+
       class Impl;
+      friend Impl;
       const std::unique_ptr<Impl> p_;
     };
   }  // namespace ametsuchi
