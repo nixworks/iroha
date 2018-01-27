@@ -15,10 +15,12 @@ properties([parameters([
     booleanParam(defaultValue: true, description: '', name: 'Linux'),
     booleanParam(defaultValue: false, description: '', name: 'ARM'),
     booleanParam(defaultValue: false, description: '', name: 'MacOS'),
+    booleanParam(defaultValue: true, description: 'Whether we should build docs or not', name: 'Doxygen'),
     string(defaultValue: '4', description: 'How much parallelism should we exploit. "4" is optimal for machines with modest amount of memory and at least 4 cores', name: 'PARALLELISM')]),
     pipelineTriggers([cron('@weekly')])])
 pipeline {
     environment {
+        CCACHE_DIR = '/opt/.ccache'
         SORABOT_TOKEN = credentials('SORABOT_TOKEN')
         SONAR_TOKEN = credentials('SONAR_TOKEN')
         CODECOV_TOKEN = credentials('CODECOV_TOKEN')
@@ -33,18 +35,16 @@ pipeline {
         IROHA_POSTGRES_PORT = 5432
         IROHA_REDIS_PORT = 6379
     }
-    agent {
-        label 'docker_1'
-    }
+    agent none
     stages {
         stage('Build Debug') {
             when { expression { params.BUILD_TYPE == 'Debug' } }
             parallel {
                 stage ('Linux') {
+                    agent { label 'linux' }
                     when { expression { return params.Linux } }
                     steps {
-                        script {
-                            def doxygen = load ".jenkinsci/doxygen.groovy"
+                        script {                            
                             def dockerize = load ".jenkinsci/dockerize.groovy"
 
                             sh "docker network create ${env.IROHA_NETWORK}"
@@ -61,13 +61,13 @@ pipeline {
 
                             docker.image("${env.DOCKER_IMAGE}").inside(""
                                 + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
-                                + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}" 
-                                + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}" 
+                                + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
+                                + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
                                 + " -e IROHA_POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
-                                + " -e IROHA_REDIS_HOST=${env.IROHA_REDIS_HOST}" 
-                                + " -e IROHA_REDIS_PORT=${env.IROHA_REDIS_PORT}" 
+                                + " -e IROHA_REDIS_HOST=${env.IROHA_REDIS_HOST}"
+                                + " -e IROHA_REDIS_PORT=${env.IROHA_REDIS_PORT}"
                                 + " --network=${env.IROHA_NETWORK}"
-                                + " -v /var/jenkins/ccache:/tmp/ccache") {
+                                + " -v /var/jenkins/ccache:${CCACHE_DIR}") {
 
                             def scmVars = checkout scm
                             env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
@@ -101,7 +101,6 @@ pipeline {
                             if ( env.BRANCH_NAME == "master" ||
                                  env.BRANCH_NAME == "develop" ) {
                                 dockerize.doDockerize()
-                                doxygen.doDoxygen()
                             }
                             
                             // Codecov
@@ -130,8 +129,77 @@ pipeline {
                 }
                 stage('ARM') {
                     when { expression { return params.ARM } }
+                    agent { label 'arm' }
                     steps {
-                        sh "echo ARM build will be running there"    
+                        script {                            
+                            def dockerize = load ".jenkinsci/dockerize.groovy"
+
+                            sh "docker network create ${env.IROHA_NETWORK}"
+
+                            def p_c = docker.image('postgres:9.5').run(""
+                                + " -e POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
+                                + " -e POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
+                                + " --name ${env.IROHA_POSTGRES_HOST}"
+                                + " --network=${env.IROHA_NETWORK}")
+
+                            def r_c = docker.image('redis:3.2.8').run(""
+                                + " --name ${env.IROHA_REDIS_HOST}"
+                                + " --network=${env.IROHA_NETWORK}")
+
+                            docker.image("hyperledger/iroha-docker-develop:armv7-v1").inside(""
+                                + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
+                                + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
+                                + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
+                                + " -e IROHA_POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
+                                + " -e IROHA_REDIS_HOST=${env.IROHA_REDIS_HOST}"
+                                + " -e IROHA_REDIS_PORT=${env.IROHA_REDIS_PORT}"
+                                + " --network=${env.IROHA_NETWORK}"
+                                + " -v /var/jenkins/ccache-arm:${CCACHE_DIR}") {
+
+                                def scmVars = checkout scm
+                                env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
+                                env.IROHA_HOME = "/opt/iroha"
+                                env.IROHA_BUILD = "/opt/iroha/build"
+                                env.IROHA_RELEASE = "${env.IROHA_HOME}/docker/release"
+
+                                sh """
+                                    ccache --version
+                                    ccache --show-stats
+                                    ccache --zero-stats
+                                    ccache --max-size=1G
+                                """
+                                sh """
+                                    cmake \
+                                      -DCOVERAGE=ON \
+                                      -DTESTING=ON \
+                                      -H. \
+                                      -Bbuild \
+                                      -DCMAKE_BUILD_TYPE=${params.BUILD_TYPE} \
+                                      -DIROHA_VERSION=${env.IROHA_VERSION}
+                                """
+                                sh "cmake --build build -- -j${params.PARALLELISM}"
+                                sh "ccache --cleanup"
+                                sh "ccache --show-stats"
+
+                                sh "cmake --build build --target test"
+                                sh "cmake --build build --target gcovr"
+                                sh "cmake --build build --target cppcheck"
+
+                                if ( env.BRANCH_NAME == "master" ||
+                                     env.BRANCH_NAME == "develop" ) {
+                                    dockerize.doDockerize()
+                                }
+                            
+                                // Codecov
+                                sh "bash <(curl -s https://codecov.io/bash) -f build/reports/gcovr.xml -t ${CODECOV_TOKEN} || echo 'Codecov did not collect coverage reports'"
+
+                                // Skip SonarQube checks to speed up builds
+
+                                //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
+                                //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
+                                archive(includes: 'build/bin/,compile_commands.json')
+                            }
+                        }
                     }                    
                 }
                 stage('MacOS'){
@@ -210,14 +278,32 @@ pipeline {
                 """
             }
         }
+        stage('Build docs') {
+            agent { label 'linux || mac || arm' }
+            when { 
+                allOf {
+                    expression { return params.Doxygen }
+                    expression { BRANCH_NAME ==~ /(master|develop)/ }
+                }
+            }
+            steps {
+                script {
+                    def doxygen = load ".jenkinsci/doxygen.groovy"
+                    docker.image("${env.DOCKER_IMAGE}").inside("") {
+                        def scmVars = checkout scm
+                        doxygen.doDoxygen()
+                    }
+                }
+            }
+        }
     }
     post {
         always {
             script {
                 sh """
-                  docker stop $IROHA_POSTGRES_HOST $IROHA_REDIS_HOST
-                  docker rm $IROHA_POSTGRES_HOST $IROHA_REDIS_HOST
-                  docker network rm $IROHA_NETWORK
+                  docker stop $IROHA_POSTGRES_HOST $IROHA_REDIS_HOST || true
+                  docker rm $IROHA_POSTGRES_HOST $IROHA_REDIS_HOST || true
+                  docker network rm $IROHA_NETWORK || true
                 """
             }
         }
