@@ -11,11 +11,11 @@ target_link_libraries(wsv_query_command_test
     libs_common
     )
 
-#addtest(flat_file_test flat_file_test.cpp)
-#target_link_libraries(flat_file_test
-#    ametsuchi
-#    libs_common
-#    )
+addtest(block_storage_test block_storage_test.cpp)
+target_link_libraries(block_storage_test
+    block_storage_nudb
+    logger
+    )
 
 addtest(block_query_test block_query_test.cpp)
 target_link_libraries(block_query_test

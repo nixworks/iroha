@@ -47,11 +47,13 @@ if (NOT nudb_FOUND)
     add_dependencies(nudb vinniefalco_nudb)
 endif ()
 
-
-# TODO: potential bug: if Boost_USE_MULTITHREADED is ON, then list should have suffix -mt, e.g. boost_system-mt
+if(APPLE)
+    set(BOOST_THREAD "boost_thread-mt")
+else()
+    set(BOOST_THREAD "boost_thread")
+endif()
 
 set_target_properties(nudb PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${nudb_INCLUDE_DIR}
-        INTERFACE_LINK_LIBRARIES "boost_system;boost_thread-mt"
+        INTERFACE_LINK_LIBRARIES "boost_system;${BOOST_THREAD}"
         )
-

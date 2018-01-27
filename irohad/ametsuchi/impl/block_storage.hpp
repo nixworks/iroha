@@ -74,6 +74,8 @@ namespace iroha {
        */
       bool add(Identifier id, const std::vector<uint8_t> &blob);
 
+      const std::string& directory() const;
+
       /**
        * Get data associated with
        * @param id - reference key

@@ -34,10 +34,17 @@ namespace iroha {
 
       // first, check if directory exists. if not -- create.
       sys::error_code err;
-      if (not fs::is_directory(path, err)
-          and not fs::create_directory(path, err)) {
-        log_->error("Cannot create storage dir: {}\n{}", path, err.message());
-        return boost::none;
+      if (fs::exists(path)) {
+        if (not fs::is_directory(path, err)) {
+          log_->error("BlockStore path {} is a file: {}", path, err.message());
+          return boost::none;
+        }
+      } else {
+        // dir does not exist, so then create
+        if (not fs::create_directory(path, err)) {
+          log_->error("Cannot create storage dir: {}\n{}", path, err.message());
+          return boost::none;
+        }
       }
 
       // paths to NuDB files
@@ -50,6 +57,9 @@ namespace iroha {
       auto db = std::make_unique<nudb::store>();
       db->open(dat.string(), key.string(), log.string(), ec);
       if (ec) {
+        // remove error message
+        ec.clear();
+
         log_->info("no database at {}, creating new", path);
 
         // then no database is there. create new database.
@@ -62,20 +72,24 @@ namespace iroha {
                                      nudb::block_size("."),
                                      Impl::load_factor_,
                                      ec);
+        if (ec) {
+          log_->critical("can not create NuDB database: {}", ec.message());
+          return boost::none;
+        }
 
         // and open again
         db->open(dat.string(), key.string(), log.string(), ec);
         if (ec) {
-          // error again :sad:
-          log_->critical("can not create NuDB database");
-          return boost::none;
+          log_->critical("can not open NuDB database: {}", ec.message());
         }
       }
 
       log_->info("database at {} successfully opened", path);
 
       auto bs = std::unique_ptr<BlockStorage>(new BlockStorage());
-      bs->p_->init(std::move(db));
+      if (!bs->p_->init(std::move(db), path)) {
+        return boost::none;
+      }
 
       // at this point database should be open
       return bs;
@@ -98,7 +112,11 @@ namespace iroha {
       return p_->drop_db();
     }
 
-    BlockStorage::BlockStorage() = default;
+    BlockStorage::BlockStorage() : p_(new Impl()){};
+
+    const std::string& BlockStorage::directory() const {
+      return p_->directory();
+    }
 
   }  // namespace ametsuchi
 }  // namespace iroha

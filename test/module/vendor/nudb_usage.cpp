@@ -22,7 +22,17 @@ auto const dat_path = "/tmp/tezt_db.dat";
 auto const key_path = "/tmp/tezt_db.key";
 auto const log_path = "/tmp/tezt_db.log";
 
-TEST(NuDB, CRUD) {
+class NuDB: public ::testing::Test {
+ public:
+
+  void TearDown() override {
+    nudb::erase_file(dat_path);
+    nudb::erase_file(key_path);
+    nudb::erase_file(log_path);
+  }
+};
+
+TEST_F(NuDB, CRUD) {
   using key_type = std::uint32_t;
   std::size_t constexpr N = 10;
   nudb::error_code ec;
@@ -48,7 +58,7 @@ TEST(NuDB, CRUD) {
 
   db.open(dat_path, key_path, log_path, ec);
   if (ec) {
-    FAIL() << "db can not be opened";
+    FAIL() << "db can not be opened: " << ec.message();
   }
 
   std::string data = "secret";
@@ -57,7 +67,8 @@ TEST(NuDB, CRUD) {
     for (key_type i = 0; i < N; ++i) {
       db.insert(&i, data.data(), data.size(), ec);
       if (ec) {
-        FAIL() << "key i=" << i << " &i=" << &i << " can not be inserted";
+        FAIL() << "key i=" << i << " &i=" << &i
+               << " can not be inserted: " << ec.message();
       }
     }
   }
@@ -67,7 +78,8 @@ TEST(NuDB, CRUD) {
       db.fetch(&i,
                [&](void const *buffer, std::size_t size) {
                  ASSERT_EQ(size, data.size())
-                     << "write and read buffers sizes are different";
+                     << "write and read buffers sizes are different: "
+                     << ec.message();
 
                  for (key_type j = 0; j < size; j++) {
                    ASSERT_EQ(((char *)buffer)[j], data[j]);
@@ -75,7 +87,8 @@ TEST(NuDB, CRUD) {
                },
                ec);
       if (ec) {
-        FAIL() << "key i=" << i << " &i=" << &i << " can not be fetched";
+        FAIL() << "key i=" << i << " &i=" << &i
+               << " can not be fetched: " << ec.message();
       }
     }
   }
@@ -83,22 +96,18 @@ TEST(NuDB, CRUD) {
   {
     key_type a = 1337;
     // try to read non-existent key
-    db.fetch(static_cast<const void*>(&a),
+    db.fetch(static_cast<const void *>(&a),
              [](const void *p, size_t size) {
                ASSERT_EQ(size, 0) << "size is " << size;
              },
              ec);
     if (ec) {
-      FAIL() << "failed during reading of non-existent key";
+      FAIL() << "failed during reading of non-existent key: " << ec.message();
     }
   }
 
   db.close(ec);
   if (ec) {
-    FAIL() << "failed during closing of database";
+    FAIL() << "failed during closing of database: " << ec.message();
   }
-
-  nudb::erase_file(dat_path);
-  nudb::erase_file(key_path);
-  nudb::erase_file(log_path);
 }

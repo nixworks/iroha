@@ -18,35 +18,43 @@
 #ifndef IROHA_BLOCK_STORAGE_NUDB_HPP
 #define IROHA_BLOCK_STORAGE_NUDB_HPP
 
-#include "ametsuchi/impl/block_storage.hpp"
+#include <array>
 #include <nudb/nudb.hpp>
+#include "ametsuchi/impl/block_storage.hpp"
 #include "logger/logger.hpp"
 
 namespace iroha {
- namespace ametsuchi {
+  namespace ametsuchi {
 
-  class BlockStorage::Impl {
-   public:
-    /** interface **/
-    void init(std::unique_ptr<nudb::store> db);
-    bool add(Identifier id, const std::vector<uint8_t> &blob);
-    boost::optional<std::vector<uint8_t>> get(Identifier id) const;
-    Identifier last_id() const;
-    uint64_t total_blocks() const;
-    bool drop_db();
+    class BlockStorage::Impl {
+     public:
+      /** interface **/
+      bool init(std::unique_ptr<nudb::store> db, const std::string &path);
+      bool add(Identifier id, const std::vector<uint8_t> &blob);
+      boost::optional<std::vector<uint8_t>> get(Identifier id) const;
+      Identifier last_id() const;
+      uint64_t total_blocks() const;
+      bool drop_db();
 
-    //< arbitrary number, app-specific
-    static constexpr size_t appid_{1337u};
-    //< load factor for basket
-    static constexpr float load_factor_{0.5f};
-   private:
-    //< total number of blocks in database
-    uint32_t total_blocks_{0};
-    std::unique_ptr<nudb::store> db_;
-    logger::Logger log_;
-  };
+      const std::string &directory() const;
 
- }
-}
+      uint32_t count_blocks(nudb::error_code &ec);
+      static std::array<uint8_t, sizeof(uint32_t)> serialize_uint32(uint32_t t);
 
-#endif //IROHA_BLOCK_STORAGE_NUDB_HPP
+      //< arbitrary number, app-specific
+      static constexpr size_t appid_{0x1337u};
+      //< load factor for basket
+      static constexpr float load_factor_{0.5f};
+
+     private:
+      //< total number of blocks in database
+      uint32_t total_blocks_{0};
+      std::unique_ptr<nudb::store> db_;
+      logger::Logger log_;
+      std::string path_;
+    };
+
+  }  // namespace ametsuchi
+}  // namespace iroha
+
+#endif  // IROHA_BLOCK_STORAGE_NUDB_HPP

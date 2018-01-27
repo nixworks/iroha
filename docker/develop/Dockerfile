@@ -32,9 +32,9 @@ RUN apt-get -y --no-install-recommends install build-essential python-software-p
 RUN pip3 install --upgrade pip; \
     pip3 install flask requests
 
-# install cmake 3.5.1
+# install cmake 3.10.2
 RUN git clone https://gitlab.kitware.com/cmake/cmake.git /tmp/cmake; \
-    (cd /tmp/cmake ; git checkout 64130a7e793483e24c1d68bdd234f81d5edb2d51); \
+    (cd /tmp/cmake ; git checkout c1e087a9d3af74299d7681c9f9de59e5977a1539); \
     (cd /tmp/cmake ; /tmp/cmake/bootstrap --parallel=${PARALLELISM} --enable-ccache); \
     make -j${PARALLELISM} -C /tmp/cmake; \
     make -C /tmp/cmake install; \
@@ -45,7 +45,9 @@ RUN git clone https://github.com/boostorg/boost /tmp/boost; \
     (cd /tmp/boost ; git checkout 436ad1dfcfc7e0246141beddd11c8a4e9c10b146); \
     (cd /tmp/boost ; git submodule init); \
     (cd /tmp/boost ; git submodule update --recursive -j ${PARALLELISM}); \
-    (cd /tmp/boost ; /tmp/boost/bootstrap.sh --with-libraries=system,filesystem); \
+    (cd /tmp/boost ; /tmp/boost/bootstrap.sh \
+        --with-libraries=system,filesystem,thread,program_options \
+    ); \
     (cd /tmp/boost ; /tmp/boost/b2 headers); \
     (cd /tmp/boost ; /tmp/boost/b2 cxxflags="-std=c++14" -j ${PARALLELISM} install); \
     rm -rf /tmp/boost
@@ -72,7 +74,7 @@ RUN git clone https://github.com/c-ares/c-ares /tmp/c-ares; \
     cmake --build /tmp/c-ares/build --target install -- -j${PARALLELISM}; \
     ldconfig; \
     rm -rf /tmp/c-ares
-    
+
 # install grpc
 RUN git clone https://github.com/grpc/grpc /tmp/grpc; \
     (cd /tmp/grpc ; git checkout bfcbad3b86c7912968dc8e64f2121c920dad4dfb); \
