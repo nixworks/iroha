@@ -181,7 +181,8 @@ pipeline {
                                 sh "ccache --cleanup"
                                 sh "ccache --show-stats"
 
-                                sh "cmake --build build --target test"
+                                //sh "cmake --build build --target test"
+                                sh "cd build && ctest --output-on-failure"
                                 sh "cmake --build build --target gcovr"
                                 sh "cmake --build build --target cppcheck"
 
