@@ -35,7 +35,7 @@ pipeline {
         IROHA_POSTGRES_PORT = 5432
         IROHA_REDIS_PORT = 6379
     }
-    agent none
+    agent any
     stages {
         stage('Build Debug') {
             when { expression { params.BUILD_TYPE == 'Debug' } }
@@ -296,6 +296,8 @@ pipeline {
             }
         }
         stage('Build docs') {
+            // build docs on any vacant node. Prefer `linux` over 
+            // others as nodes are more powerful
             agent { label 'linux || mac || arm' }
             when { 
                 allOf {
