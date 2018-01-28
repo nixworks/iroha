@@ -79,9 +79,9 @@ namespace iroha {
       boost::optional<std::vector<uint8_t>> get(Identifier id) const;
 
       /**
-       * @return number of blocks in block storage.
+       * @return number of identifiers in block storage.
        */
-      size_t total_blocks() const;
+      size_t total_keys() const;
 
       /**
        * @brief Clear database.

@@ -62,13 +62,10 @@ TEST_F(BlStore_Test, Read_Write_Test) {
   auto store = BlockStorage::create(block_store_path);
   ASSERT_TRUE(store);
   auto bl_store = std::move(*store);
-  auto id = 1u;
+  bl_store->add(0, block);
+  bl_store->add(1, block);
 
-  bl_store->add(id, block);
-  auto id2 = 2u;
-  bl_store->add(id2, block);
-
-  auto res = bl_store->get(id);
+  auto res = bl_store->get(0);
   ASSERT_TRUE(res);
   ASSERT_FALSE(res->empty());
 
@@ -82,13 +79,18 @@ TEST_F(BlStore_Test, Read_Write_Test) {
  * @then new block storage has all blocks from the folder
  */
 TEST_F(BlStore_Test, BlockStoreInitializationFromNonemptyFolder) {
-  auto store = BlockStorage::create(block_store_path);
-  ASSERT_TRUE(store);
-  auto bl_store1 = std::move(*store);
+  uint64_t total1 = 0u;
+  {
+    auto store = BlockStorage::create(block_store_path);
+    ASSERT_TRUE(store);
+    auto bl_store1 = std::move(*store);
 
-  // Add two blocks to storage
-  ASSERT_TRUE(bl_store1->add(0u, block));
-  ASSERT_TRUE(bl_store1->add(1u, block));
+    // Add two blocks to storage
+    ASSERT_TRUE(bl_store1->add(0u, block));
+    ASSERT_TRUE(bl_store1->add(1u, block));
+
+    total1 = bl_store1->total_keys();
+  }
 
   // create second block storage from the same folder
   auto store2 = BlockStorage::create(block_store_path);
@@ -96,7 +98,7 @@ TEST_F(BlStore_Test, BlockStoreInitializationFromNonemptyFolder) {
   auto bl_store2 = std::move(*store2);
 
   // check that last ids of both block storages are the same
-  ASSERT_EQ(bl_store1->total_blocks(), bl_store2->total_blocks());
+  ASSERT_EQ(total1, bl_store2->total_keys());
 }
 
 /**
@@ -142,9 +144,9 @@ TEST_F(BlStore_Test, WriteThenReadSequential) {
 
   for (uint8_t i = 0x00; i < 0xff; i++) {
     auto v = std::vector<uint8_t>(16, i);
-    auto total = bs->total_blocks();
+    auto total = bs->total_keys();
     ASSERT_TRUE(bs->add(i, v)) << "can not add block";
-    ASSERT_EQ(total + 1, bs->total_blocks());
+    ASSERT_EQ(total + 1, bs->total_keys());
 
     auto item = bs->get(i);
     if (!item) {

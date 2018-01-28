@@ -23,14 +23,17 @@
 using namespace iroha::model::generators;
 using namespace iroha::model::converters;
 
+#define INTERNAL_PORT 12349
+
 // TODO: refactor services to allow dynamic port binding IR-741
 class TxPipelineIntegrationTest : public TxPipelineIntegrationTestFixture {
  public:
   void SetUp() override {
     iroha::ametsuchi::AmetsuchiTest::SetUp();
 
+    std::string address = "0.0.0.0:" + std::to_string(INTERNAL_PORT);
     auto genesis_tx =
-        TransactionGenerator().generateGenesisTransaction(0, {"0.0.0.0:10001"});
+        TransactionGenerator().generateGenesisTransaction(0, {address});
     genesis_block =
         iroha::model::generators::BlockGenerator().generateGenesisBlock(
             0, {genesis_tx});
@@ -43,7 +46,7 @@ class TxPipelineIntegrationTest : public TxPipelineIntegrationTestFixture {
                                           redisport_,
                                           pgopt_,
                                           0,
-                                          10001,
+                                          INTERNAL_PORT,
                                           10,
                                           5000ms,
                                           5000ms,

@@ -43,10 +43,14 @@ RUN git clone https://gitlab.kitware.com/cmake/cmake.git /tmp/cmake; \
 # install boost 1.65.1
 RUN git clone https://github.com/boostorg/boost /tmp/boost; \
     (cd /tmp/boost ; git checkout 436ad1dfcfc7e0246141beddd11c8a4e9c10b146); \
-    (cd /tmp/boost ; git submodule init); \
-    (cd /tmp/boost ; git submodule update --recursive -j ${PARALLELISM}); \
+    (cd /tmp/boost ; git submodule update --init \
+        # filesystem -> system
+        # thread -> chrono
+        tools/build libs/config libs/chrono libs/system \
+        libs/filesystem libs/thread libs/program_options
+    ); \
     (cd /tmp/boost ; /tmp/boost/bootstrap.sh \
-        --with-libraries=system,filesystem,thread,program_options \
+        --with-libraries=system,filesystem,thread,program_options,chrono \
     ); \
     (cd /tmp/boost ; /tmp/boost/b2 headers); \
     (cd /tmp/boost ; /tmp/boost/b2 cxxflags="-std=c++14" -j ${PARALLELISM} install); \

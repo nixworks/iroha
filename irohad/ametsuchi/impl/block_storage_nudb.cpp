@@ -170,7 +170,6 @@ namespace iroha {
 
     uint32_t BlockStorage::Impl::count_blocks(nudb::error_code &ec) {
       BlockStorage::Identifier current = 0;
-      uint32_t total = 0;
 
       bool found_last = false;
 
@@ -178,10 +177,9 @@ namespace iroha {
         auto key = serialize_uint32(current);
         db_->fetch(
             key.data(),
-            [&total, &found_last, &current](const void *value, size_t size) {
+            [&found_last, &current](const void *value, size_t size) {
               // if we read 0 bytes, then there is no such key
               if (size == 0u) {
-                total = current;
                 found_last = true;
                 return;
               }
@@ -191,14 +189,14 @@ namespace iroha {
             },
             ec);
         if (ec == nudb::error::key_not_found) {
-          return total;
+          return current;
         } else if (ec) {
           // some other error occurred
           return 0;
         }
       } while (!found_last);
 
-      return total;
+      return current;
     }
 
     std::array<uint8_t, sizeof(uint32_t)> BlockStorage::Impl::serialize_uint32(
@@ -214,7 +212,7 @@ namespace iroha {
       return b;
     }
 
-    size_t BlockStorage::Impl::total_blocks() const {
+    size_t BlockStorage::Impl::total_keys() const {
       return total_blocks_;
     }
 

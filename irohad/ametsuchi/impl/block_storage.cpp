@@ -52,8 +52,8 @@ namespace iroha {
       return p_->directory();
     }
 
-    size_t BlockStorage::total_blocks() const {
-      return p_->total_blocks();
+    size_t BlockStorage::total_keys() const {
+      return p_->total_keys();
     }
 
 

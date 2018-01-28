@@ -16,6 +16,7 @@
  */
 
 #include "ametsuchi/impl/redis_block_query.hpp"
+#include <iostream>
 #include "ametsuchi/impl/block_storage.hpp"
 #include "cryptography/ed25519_sha3_impl/internal/sha3_hash.hpp"
 
@@ -28,11 +29,13 @@ namespace iroha {
 
     rxcpp::observable<model::Block> RedisBlockQuery::getBlocks(uint32_t height,
                                                                uint32_t count) {
-      size_t last_id = block_store_.total_blocks();
-      auto to = std::min((uint32_t)last_id, height + count - 1);
-      if (height > to or count == 0) {
+      size_t total = block_store_.total_keys();
+      if (height >= total or count == 0) {
         return rxcpp::observable<>::empty<model::Block>();
       }
+
+      // total here is guaranteed to be > 0
+      auto to = std::min(static_cast<uint32_t>(total), height + count);
 
       return rxcpp::observable<>::range(height, to).flat_map([this](auto i) {
         auto bytes = block_store_.get(i);
@@ -61,13 +64,13 @@ namespace iroha {
     rxcpp::observable<model::Block> RedisBlockQuery::getBlocksFrom(
         uint32_t height) {
       return getBlocks(height,
-                       static_cast<uint32_t>(block_store_.total_blocks()));
+                       static_cast<uint32_t>(block_store_.total_keys()));
     }
 
     rxcpp::observable<model::Block> RedisBlockQuery::getTopBlocks(
         uint32_t count) {
-      auto total = block_store_.total_blocks();
-      auto from = total == 0 ? 0 : total - 1;
+      auto total = block_store_.total_keys();
+      auto from = total < count ? 0 : total - count;
       return getBlocks(static_cast<uint32_t>(from), count);
     }
 

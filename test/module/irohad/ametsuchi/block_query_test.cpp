@@ -33,6 +33,8 @@ class BlockQueryTest : public AmetsuchiTest {
   void SetUp() override {
     AmetsuchiTest::SetUp();
 
+    uint64_t height = 0;
+
     auto tmp = BlockStorage::create(block_store_path);
     ASSERT_TRUE(tmp);
     file = std::move(*tmp);
@@ -51,7 +53,7 @@ class BlockQueryTest : public AmetsuchiTest {
     tx_hashes.push_back(iroha::hash(txn1_2));
 
     Block block1;
-    block1.height = 1;
+    block1.height = height++;
     block1.transactions.push_back(txn1_1);
     block1.transactions.push_back(txn1_2);
     auto block1hash = iroha::hash(block1);
@@ -68,7 +70,7 @@ class BlockQueryTest : public AmetsuchiTest {
     tx_hashes.push_back(iroha::hash(txn2_2));
 
     Block block2;
-    block2.height = 2;
+    block2.height = height++;
     block2.prev_hash = block1hash;
     block2.transactions.push_back(txn2_1);
     block2.transactions.push_back(txn2_2);
@@ -259,25 +261,13 @@ TEST_F(BlockQueryTest, GetBlocks_Count0) {
 /**
  * @given block store with 2 blocks totally containing 3 txs created by
  * user1@test AND 1 tx created by user2@test
- * @when get zero block
- * @then no blocks returned
- */
-TEST_F(BlockQueryTest, GetZeroBlock) {
-  auto wrapper = make_test_subscriber<CallExact>(blocks->getBlocks(0, 1), 0);
-  wrapper.subscribe();
-  ASSERT_TRUE(wrapper.validate());
-}
-
-/**
- * @given block store with 2 blocks totally containing 3 txs created by
- * user1@test AND 1 tx created by user2@test
- * @when get all blocks starting from 1
+ * @when get all blocks starting from 0
  * @then returned all blocks (2)
  */
-TEST_F(BlockQueryTest, GetBlocksFrom1) {
+TEST_F(BlockQueryTest, GetBlocksFrom0) {
   auto wrapper =
-      make_test_subscriber<CallExact>(blocks->getBlocksFrom(1), blocks_total);
-  size_t counter = 1;
+      make_test_subscriber<CallExact>(blocks->getBlocksFrom(0), blocks_total);
+  size_t counter = 0;
   wrapper.subscribe([&counter](Block b) {
     // wrapper returns blocks 1 and 2
     ASSERT_EQ(b.height, counter++) << "block height: " << b.height
@@ -288,7 +278,7 @@ TEST_F(BlockQueryTest, GetBlocksFrom1) {
 
 /**
  * @given block store with 2 blocks totally containing 3 txs created by
- * user1@test AND 1 tx created by user2@test
+ * user1@test AND 1 tx created by user2@test) 
  * @when get top 2 blocks
  * @then last 2 blocks returned with correct height
  */
@@ -297,7 +287,7 @@ TEST_F(BlockQueryTest, GetTop2Blocks) {
   auto wrapper =
       make_test_subscriber<CallExact>(blocks->getTopBlocks(blocks_n), blocks_n);
 
-  size_t counter = blocks_total - blocks_n + 1;
+  size_t counter = blocks_total - blocks_n;
   wrapper.subscribe([&counter](Block b) { ASSERT_EQ(b.height, counter++); });
 
   ASSERT_TRUE(wrapper.validate());

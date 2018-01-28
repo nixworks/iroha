@@ -34,7 +34,7 @@ namespace iroha {
       bool init(std::unique_ptr<nudb::store> db, const std::string &path);
       bool add(Identifier id, const std::vector<uint8_t> &blob);
       boost::optional<std::vector<uint8_t>> get(Identifier id) const;
-      size_t total_blocks() const;
+      size_t total_keys() const;
       bool drop_db();
 
       const std::string &directory() const;
