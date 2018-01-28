@@ -27,6 +27,73 @@ namespace iroha {
     namespace sys = boost::system;
     using Identifier = BlockStorage::Identifier;
 
+    boost::optional<std::unique_ptr<BlockStorage>> BlockStorage::Impl::create(
+        const std::string &path) {
+      auto log_ = logger::log("BlockStorage");
+
+      // first, check if directory exists. if not -- create.
+      sys::error_code err;
+      if (fs::exists(path)) {
+        if (not fs::is_directory(path, err)) {
+          log_->error("BlockStore path {} is a file: {}", path, err.message());
+          return boost::none;
+        }
+      } else {
+        // dir does not exist, so then create
+        if (not fs::create_directory(path, err)) {
+          log_->error("Cannot create storage dir: {}\n{}", path, err.message());
+          return boost::none;
+        }
+      }
+
+      // paths to NuDB files
+      fs::path dat = fs::path{path} / "iroha.dat";
+      fs::path key = fs::path{path} / "iroha.key";
+      fs::path log = fs::path{path} / "iroha.log";
+
+      // try to open NuDB database
+      nudb::error_code ec;
+      auto db = std::make_unique<nudb::store>();
+      db->open(dat.string(), key.string(), log.string(), ec);
+      if (ec) {
+        // remove error message
+        ec.clear();
+
+        log_->info("no database at {}, creating new", path);
+
+        // then no database is there. create new database.
+        nudb::create<nudb::xxhasher>(dat.string(),
+                                     key.string(),
+                                     log.string(),
+                                     Impl::appid_,
+                                     Impl::salt_,
+                                     sizeof(Identifier),
+                                     nudb::block_size("."),
+                                     Impl::load_factor_,
+                                     ec);
+        if (ec) {
+          log_->critical("can not create NuDB database: {}", ec.message());
+          return boost::none;
+        }
+
+        // and open again
+        db->open(dat.string(), key.string(), log.string(), ec);
+        if (ec) {
+          log_->critical("can not open NuDB database: {}", ec.message());
+        }
+      }
+
+      log_->info("database at {} successfully opened", path);
+
+      auto bs = std::unique_ptr<BlockStorage>(new BlockStorage());
+      if (!bs->p_->init(std::move(db), path)) {
+        return boost::none;
+      }
+
+      // at this point database should be open
+      return bs;
+    }
+
     std::string BlockStorage::id_to_name(Identifier id) {
       std::ostringstream os;
       os << std::setw(BlockStorage::DIGIT_CAPACITY) << std::setfill('0') << id;
@@ -40,7 +107,6 @@ namespace iroha {
     bool BlockStorage::Impl::init(std::unique_ptr<nudb::store> db,
                                   const std::string &path) {
       db_ = std::move(db);
-      log_ = logger::log("BlockStorage::Impl::init()");
 
       nudb::error_code ec;
       total_blocks_ = count_blocks(ec);  // replaces check_consistency
@@ -60,12 +126,13 @@ namespace iroha {
     bool BlockStorage::Impl::add(Identifier id,
                                  const std::vector<uint8_t> &blob) {
       nudb::error_code ec;
-      db_->insert(serialize_uint32(id).data(), blob.data(), blob.size(), ec);
-      if(ec){
+      auto key = serialize_uint32(id);
+      db_->insert(key.data(), blob.data(), blob.size(), ec);
+      if (ec) {
         log_->error("BlockStorage::add(): {}", ec.message());
         return false;
       }
-      total_blocks_++;
+      ++total_blocks_;
       return true;
     }
 
@@ -91,18 +158,6 @@ namespace iroha {
       return ret;
     }
 
-    Identifier BlockStorage::Impl::last_id() const {
-      if (total_blocks_ < BlockStorage::START_INDEX) {
-        return 0;  // = no blocks in storage
-      } else {
-        return total_blocks_ + BlockStorage::START_INDEX;
-      }
-    }
-
-    uint64_t BlockStorage::Impl::total_blocks() const {
-      return total_blocks_;
-    }
-
     bool BlockStorage::Impl::drop_db() {
       nudb::error_code ec1, ec2, ec3;
 
@@ -114,19 +169,18 @@ namespace iroha {
     }
 
     uint32_t BlockStorage::Impl::count_blocks(nudb::error_code &ec) {
-      BlockStorage::Identifier current = BlockStorage::START_INDEX;
+      BlockStorage::Identifier current = 0;
       uint32_t total = 0;
 
       bool found_last = false;
 
       do {
+        auto key = serialize_uint32(current);
         db_->fetch(
-            serialize_uint32(current).data(),
+            key.data(),
             [&total, &found_last, &current](const void *value, size_t size) {
               // if we read 0 bytes, then there is no such key
               if (size == 0u) {
-                // if total=3, then current=3 will read 0 bytes, so
-                // total=current here
                 total = current;
                 found_last = true;
                 return;
@@ -144,7 +198,7 @@ namespace iroha {
         }
       } while (!found_last);
 
-      return total - BlockStorage::START_INDEX;
+      return total;
     }
 
     std::array<uint8_t, sizeof(uint32_t)> BlockStorage::Impl::serialize_uint32(
@@ -158,6 +212,10 @@ namespace iroha {
       b[i++] = t & 0xFF;
 
       return b;
+    }
+
+    size_t BlockStorage::Impl::total_blocks() const {
+      return total_blocks_;
     }
 
   }  // namespace ametsuchi

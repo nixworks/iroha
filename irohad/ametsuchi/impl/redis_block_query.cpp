@@ -28,8 +28,8 @@ namespace iroha {
 
     rxcpp::observable<model::Block> RedisBlockQuery::getBlocks(uint32_t height,
                                                                uint32_t count) {
-      auto last_id = block_store_.last_id();
-      auto to = std::min(last_id, height + count - 1);
+      size_t last_id = block_store_.total_blocks();
+      auto to = std::min((uint32_t)last_id, height + count - 1);
       if (height > to or count == 0) {
         return rxcpp::observable<>::empty<model::Block>();
       }
@@ -60,14 +60,15 @@ namespace iroha {
 
     rxcpp::observable<model::Block> RedisBlockQuery::getBlocksFrom(
         uint32_t height) {
-      return getBlocks(height, block_store_.last_id());
+      return getBlocks(height,
+                       static_cast<uint32_t>(block_store_.total_blocks()));
     }
 
     rxcpp::observable<model::Block> RedisBlockQuery::getTopBlocks(
         uint32_t count) {
-      auto last_id = block_store_.last_id();
-      count = std::min(count, last_id);
-      return getBlocks(last_id - count + 1, count);
+      auto total = block_store_.total_blocks();
+      auto from = total == 0 ? 0 : total - 1;
+      return getBlocks(static_cast<uint32_t>(from), count);
     }
 
     std::vector<iroha::model::Block::BlockHeightType>
@@ -175,7 +176,7 @@ namespace iroha {
           [this, tx_hashes](auto subscriber) {
             std::for_each(tx_hashes.begin(),
                           tx_hashes.end(),
-                          [that = this, &subscriber](auto tx_hash) {
+                          [ that = this, &subscriber ](auto tx_hash) {
                             subscriber.on_next(
                                 that->getTxByHashSync(tx_hash.to_string()));
                           });

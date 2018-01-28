@@ -33,11 +33,7 @@ static logger::Logger log_ = logger::testLog("BlockStore");
 
 class BlStore_Test : public ::testing::Test {
  protected:
-  void SetUp() override {
-    block = std::vector<uint8_t>(100, 5);
-  }
-
-  void TearDown() override {
+  void clear() {
     try {
       namespace fs = boost::filesystem;
       using perms = boost::filesystem::perms;
@@ -48,6 +44,16 @@ class BlStore_Test : public ::testing::Test {
     } catch (...) {
     }
   }
+
+  void SetUp() override {
+    block = std::vector<uint8_t>(16, 'a');
+    clear();
+  }
+
+  void TearDown() override {
+    clear();
+  }
+
   std::string block_store_path = "/tmp/dump";
   std::vector<uint8_t> block;
 };
@@ -81,8 +87,8 @@ TEST_F(BlStore_Test, BlockStoreInitializationFromNonemptyFolder) {
   auto bl_store1 = std::move(*store);
 
   // Add two blocks to storage
-  bl_store1->add(1u, block);
-  bl_store1->add(2u, block);
+  ASSERT_TRUE(bl_store1->add(0u, block));
+  ASSERT_TRUE(bl_store1->add(1u, block));
 
   // create second block storage from the same folder
   auto store2 = BlockStorage::create(block_store_path);
@@ -90,7 +96,7 @@ TEST_F(BlStore_Test, BlockStoreInitializationFromNonemptyFolder) {
   auto bl_store2 = std::move(*store2);
 
   // check that last ids of both block storages are the same
-  ASSERT_EQ(bl_store1->last_id(), bl_store2->last_id());
+  ASSERT_EQ(bl_store1->total_blocks(), bl_store2->total_blocks());
 }
 
 /**
@@ -131,22 +137,20 @@ TEST_F(BlStore_Test, WriteEmptyFolder) {
 
 TEST_F(BlStore_Test, WriteThenReadSequential) {
   auto s = BlockStorage::create(block_store_path);
-  if (s) {
-    auto bs = std::move(*s);
-    for (uint i = 0x00; i <= 0xff; i++) {
-      auto v = std::vector<uint8_t>(16, i);
-      auto last = bs->last_id();
-      bs->add(i, v);
-      ASSERT_EQ(last + 1, bs->last_id());
+  ASSERT_TRUE(s);
+  auto bs = std::move(*s);
 
-      auto item = bs->get(i);
-      if (!item) {
-        FAIL() << "wrote item " << i << " then read empty";
-      } else {
-        ASSERT_EQ(*item, v);
-      }
+  for (uint8_t i = 0x00; i < 0xff; i++) {
+    auto v = std::vector<uint8_t>(16, i);
+    auto total = bs->total_blocks();
+    ASSERT_TRUE(bs->add(i, v)) << "can not add block";
+    ASSERT_EQ(total + 1, bs->total_blocks());
+
+    auto item = bs->get(i);
+    if (!item) {
+      FAIL() << "wrote item " << i << " then read empty";
+    } else {
+      ASSERT_EQ(*item, v);
     }
-  } else {
-    FAIL() << "can not create block storage at " << block_store_path;
   }
 }

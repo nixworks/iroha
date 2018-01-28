@@ -41,11 +41,6 @@ namespace iroha {
       static const uint32_t DIGIT_CAPACITY{10u};
 
       /**
-       * @brief block identifiers start with this number.
-       */
-      static const Identifier START_INDEX{1u};
-
-      /**
        * Convert id to a string representation. The string representation is
        * always DIGIT_CAPACITY-character width regardless of the value of `id`.
        * If the length of the string representation of `id` is less than
@@ -84,9 +79,9 @@ namespace iroha {
       boost::optional<std::vector<uint8_t>> get(Identifier id) const;
 
       /**
-       * @return maximal not null key
+       * @return number of blocks in block storage.
        */
-      Identifier last_id() const;
+      size_t total_blocks() const;
 
       /**
        * @brief Clear database.
@@ -105,7 +100,6 @@ namespace iroha {
       BlockStorage();
 
       class Impl;
-      friend Impl;
       const std::unique_ptr<Impl> p_;
     };
   }  // namespace ametsuchi
