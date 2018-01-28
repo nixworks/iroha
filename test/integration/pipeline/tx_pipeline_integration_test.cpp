@@ -23,7 +23,7 @@
 using namespace iroha::model::generators;
 using namespace iroha::model::converters;
 
-#define INTERNAL_PORT 12349
+#define INTERNAL_PORT 10001
 
 // TODO: refactor services to allow dynamic port binding IR-741
 class TxPipelineIntegrationTest : public TxPipelineIntegrationTestFixture {
