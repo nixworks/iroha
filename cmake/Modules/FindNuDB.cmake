@@ -25,26 +25,28 @@ find_package_handle_standard_args(nudb DEFAULT_MSG
         )
 
 
-set(URL https://github.com/vinniefalco/NuDB.git)
-set(VERSION 6b4779f737d72038c716d0ecbc0701411dff083e) # latest master, 1.0.2
+set(URL https://github.com/warchant/NuDB.git)
+set(VERSION 4535601bb71c578061edd3c3c9098d828ae12b5b) # latest master, 1.0.2
 set_target_description(nudb "Fast KV database" ${URL} ${VERSION})
 
 
 if (NOT nudb_FOUND)
-    externalproject_add(vinniefalco_nudb
+    externalproject_add(warchant_nudb
             GIT_REPOSITORY ${URL}
             GIT_TAG        ${VERSION}
+            GIT_SUBMODULES "doc/docca" # disable submodules.
+            CMAKE_ARGS     -DBoost_NO_SYSTEM_PATHS=OFF
             CONFIGURE_COMMAND "" # remove configure step
             BUILD_COMMAND     "" # remove build step
             INSTALL_COMMAND   "" # remove install step
             UPDATE_COMMAND    "" # remove update step
             TEST_COMMAND      "" # remove test step
             )
-    externalproject_get_property(vinniefalco_nudb source_dir)
+    externalproject_get_property(warchant_nudb source_dir)
     set(nudb_INCLUDE_DIR ${source_dir}/include)
     file(MAKE_DIRECTORY ${nudb_INCLUDE_DIR})
 
-    add_dependencies(nudb vinniefalco_nudb)
+    add_dependencies(nudb warchant_nudb)
 endif ()
 
 if(APPLE)

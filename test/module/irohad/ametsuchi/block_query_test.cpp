@@ -33,7 +33,7 @@ class BlockQueryTest : public AmetsuchiTest {
   void SetUp() override {
     AmetsuchiTest::SetUp();
 
-    uint64_t height = 0;
+    uint64_t height = AmetsuchiTest::FIRST_BLOCK;
 
     auto tmp = BlockStorage::create(block_store_path);
     ASSERT_TRUE(tmp);
@@ -266,8 +266,8 @@ TEST_F(BlockQueryTest, GetBlocks_Count0) {
  */
 TEST_F(BlockQueryTest, GetBlocksFrom0) {
   auto wrapper =
-      make_test_subscriber<CallExact>(blocks->getBlocksFrom(0), blocks_total);
-  size_t counter = 0;
+      make_test_subscriber<CallExact>(blocks->getBlocksFrom(AmetsuchiTest::FIRST_BLOCK), blocks_total);
+  size_t counter = AmetsuchiTest::FIRST_BLOCK;
   wrapper.subscribe([&counter](Block b) {
     // wrapper returns blocks 1 and 2
     ASSERT_EQ(b.height, counter++) << "block height: " << b.height
@@ -278,7 +278,7 @@ TEST_F(BlockQueryTest, GetBlocksFrom0) {
 
 /**
  * @given block store with 2 blocks totally containing 3 txs created by
- * user1@test AND 1 tx created by user2@test) 
+ * user1@test AND 1 tx created by user2@test)
  * @when get top 2 blocks
  * @then last 2 blocks returned with correct height
  */

@@ -100,7 +100,7 @@ namespace iroha {
       BlockStorage();
 
       class Impl;
-      const std::unique_ptr<Impl> p_;
+      std::unique_ptr<Impl> p_;
     };
   }  // namespace ametsuchi
 }  // namespace iroha

@@ -29,24 +29,32 @@ namespace iroha {
     class BlockStorage::Impl {
      public:
       /** interface **/
+
+      Impl();
+
       static boost::optional<std::unique_ptr<BlockStorage>> create(
           const std::string &path);
+
       bool init(std::unique_ptr<nudb::store> db, const std::string &path);
+
       bool add(Identifier id, const std::vector<uint8_t> &blob);
+
       boost::optional<std::vector<uint8_t>> get(Identifier id) const;
+
       size_t total_keys() const;
+
       bool drop_db();
 
       const std::string &directory() const;
 
       uint32_t count_blocks(nudb::error_code &ec);
+
       static std::array<uint8_t, sizeof(uint32_t)> serialize_uint32(uint32_t t);
 
       //< arbitrary number, app-specific
       static constexpr size_t appid_{0x1337u};
       //< load factor for basket
       static constexpr float load_factor_{0.5f};
-      static constexpr uint64_t salt_{0x0322deadbeef1337};
 
      private:
       //< total number of blocks in database

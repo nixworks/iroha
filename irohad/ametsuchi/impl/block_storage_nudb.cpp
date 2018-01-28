@@ -27,6 +27,8 @@ namespace iroha {
     namespace sys = boost::system;
     using Identifier = BlockStorage::Identifier;
 
+    BlockStorage::Impl::Impl() {}
+
     boost::optional<std::unique_ptr<BlockStorage>> BlockStorage::Impl::create(
         const std::string &path) {
       auto log_ = logger::log("BlockStorage");
@@ -66,7 +68,7 @@ namespace iroha {
                                      key.string(),
                                      log.string(),
                                      Impl::appid_,
-                                     Impl::salt_,
+                                     nudb::make_salt(),
                                      sizeof(Identifier),
                                      nudb::block_size("."),
                                      Impl::load_factor_,
@@ -80,6 +82,7 @@ namespace iroha {
         db->open(dat.string(), key.string(), log.string(), ec);
         if (ec) {
           log_->critical("can not open NuDB database: {}", ec.message());
+          return boost::none;
         }
       }
 
@@ -92,12 +95,6 @@ namespace iroha {
 
       // at this point database should be open
       return bs;
-    }
-
-    std::string BlockStorage::id_to_name(Identifier id) {
-      std::ostringstream os;
-      os << std::setw(BlockStorage::DIGIT_CAPACITY) << std::setfill('0') << id;
-      return os.str();
     }
 
     const std::string &BlockStorage::Impl::directory() const {
@@ -140,7 +137,8 @@ namespace iroha {
         Identifier id) const {
       nudb::error_code ec;
       boost::optional<std::vector<uint8_t>> ret;
-      db_->fetch(serialize_uint32(id).data(),
+      auto key = serialize_uint32(id);
+      db_->fetch(key.data(),
                  [&ret](const void *p, size_t size) {
                    if (size == 0) {
                      ret = boost::none;
@@ -175,19 +173,18 @@ namespace iroha {
 
       do {
         auto key = serialize_uint32(current);
-        db_->fetch(
-            key.data(),
-            [&found_last, &current](const void *value, size_t size) {
-              // if we read 0 bytes, then there is no such key
-              if (size == 0u) {
-                found_last = true;
-                return;
-              }
+        db_->fetch(key.data(),
+                   [&found_last, &current](const void *value, size_t size) {
+                     // if we read 0 bytes, then there is no such key
+                     if (size == 0u) {
+                       found_last = true;
+                       return;
+                     }
 
-              // go to the next key
-              current++;
-            },
-            ec);
+                     // go to the next key
+                     current++;
+                   },
+                   ec);
         if (ec == nudb::error::key_not_found) {
           return current;
         } else if (ec) {
