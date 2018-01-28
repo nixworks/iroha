@@ -123,7 +123,6 @@ pipeline {
                             //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
                             //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
                             archive(includes: 'build/bin/,compile_commands.json')
-                            }                            
                         }
                     }
                     post {
@@ -216,7 +215,6 @@ pipeline {
                             script {
                                 def doxygen = load ".jenkinsci/docker-cleanup.groovy"
                                 doxygen.doDockerCleanup()
-                                }
                             }
                         }
                     }
