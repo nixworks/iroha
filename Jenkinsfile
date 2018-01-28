@@ -12,8 +12,8 @@
 //   |            |----Release
 properties([parameters([
     choice(choices: 'Debug\nRelease', description: '', name: 'BUILD_TYPE'),
-    booleanParam(defaultValue: true, description: '', name: 'Linux'),
-    booleanParam(defaultValue: false, description: '', name: 'ARM'),
+    booleanParam(defaultValue: false, description: '', name: 'Linux'),
+    booleanParam(defaultValue: true, description: '', name: 'ARM'),
     booleanParam(defaultValue: false, description: '', name: 'MacOS'),
     booleanParam(defaultValue: true, description: 'Whether we should build docs or not', name: 'Doxygen'),
     string(defaultValue: '4', description: 'How much parallelism should we exploit. "4" is optimal for machines with modest amount of memory and at least 4 cores', name: 'PARALLELISM')]),
@@ -69,60 +69,60 @@ pipeline {
                                 + " --network=${env.IROHA_NETWORK}"
                                 + " -v /var/jenkins/ccache:${CCACHE_DIR}") {
 
-                            def scmVars = checkout scm
-                            env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
-                            env.IROHA_HOME = "/opt/iroha"
-                            env.IROHA_BUILD = "/opt/iroha/build"
-                            env.IROHA_RELEASE = "${env.IROHA_HOME}/docker/release"
+                                def scmVars = checkout scm
+                                env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
+                                env.IROHA_HOME = "/opt/iroha"
+                                env.IROHA_BUILD = "/opt/iroha/build"
+                                env.IROHA_RELEASE = "${env.IROHA_HOME}/docker/release"
 
-                            sh """
-                                ccache --version
-                                ccache --show-stats
-                                ccache --zero-stats
-                                ccache --max-size=1G
-                            """
-                            sh """
-                                cmake \
-                                  -DCOVERAGE=ON \
-                                  -DTESTING=ON \
-                                  -H. \
-                                  -Bbuild \
-                                  -DCMAKE_BUILD_TYPE=${params.BUILD_TYPE} \
-                                  -DIROHA_VERSION=${env.IROHA_VERSION}
-                            """
-                            sh "cmake --build build -- -j${params.PARALLELISM}"
-                            sh "ccache --cleanup"
-                            sh "ccache --show-stats"
-
-                            sh "cmake --build build --target test"
-                            sh "cmake --build build --target gcovr"
-                            sh "cmake --build build --target cppcheck"
-
-                            if ( env.BRANCH_NAME == "master" ||
-                                 env.BRANCH_NAME == "develop" ) {
-                                dockerize.doDockerize()
-                            }
-                            
-                            // Codecov
-                            sh "bash <(curl -s https://codecov.io/bash) -f build/reports/gcovr.xml -t ${CODECOV_TOKEN} || echo 'Codecov did not collect coverage reports'"
-
-                            // Sonar
-                            if (env.CHANGE_ID != null) {
                                 sh """
-                                    sonar-scanner \
-                                        -Dsonar.github.disableInlineComments \
-                                        -Dsonar.github.repository='hyperledger/iroha' \
-                                        -Dsonar.analysis.mode=preview \
-                                        -Dsonar.login=${SONAR_TOKEN} \
-                                        -Dsonar.projectVersion=${BUILD_TAG} \
-                                        -Dsonar.github.oauth=${SORABOT_TOKEN} \
-                                        -Dsonar.github.pullRequest=${CHANGE_ID}
+                                    ccache --version
+                                    ccache --show-stats
+                                    ccache --zero-stats
+                                    ccache --max-size=1G
                                 """
-                            }
+                                sh """
+                                    cmake \
+                                      -DCOVERAGE=ON \
+                                      -DTESTING=ON \
+                                      -H. \
+                                      -Bbuild \
+                                      -DCMAKE_BUILD_TYPE=${params.BUILD_TYPE} \
+                                      -DIROHA_VERSION=${env.IROHA_VERSION}
+                                """
+                                sh "cmake --build build -- -j${params.PARALLELISM}"
+                                sh "ccache --cleanup"
+                                sh "ccache --show-stats"
 
-                            //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
-                            //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
-                            archive(includes: 'build/bin/,compile_commands.json')
+                                sh "cmake --build build --target test"
+                                sh "cmake --build build --target gcovr"
+                                sh "cmake --build build --target cppcheck"
+
+                                if ( env.BRANCH_NAME == "master" ||
+                                     env.BRANCH_NAME == "develop" ) {
+                                    dockerize.doDockerize()
+                                }
+                                
+                                // Codecov
+                                sh "bash <(curl -s https://codecov.io/bash) -f build/reports/gcovr.xml -t ${CODECOV_TOKEN} || echo 'Codecov did not collect coverage reports'"
+
+                                // Sonar
+                                if (env.CHANGE_ID != null) {
+                                    sh """
+                                        sonar-scanner \
+                                            -Dsonar.github.disableInlineComments \
+                                            -Dsonar.github.repository='hyperledger/iroha' \
+                                            -Dsonar.analysis.mode=preview \
+                                            -Dsonar.login=${SONAR_TOKEN} \
+                                            -Dsonar.projectVersion=${BUILD_TAG} \
+                                            -Dsonar.github.oauth=${SORABOT_TOKEN} \
+                                            -Dsonar.github.pullRequest=${CHANGE_ID}
+                                    """
+                                }
+                                //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
+                                //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
+                                archive(includes: 'build/bin/,compile_commands.json')
+                            }
                         }
                     }
                     post {
@@ -130,11 +130,10 @@ pipeline {
                             script {
                                 def doxygen = load ".jenkinsci/docker-cleanup.groovy"
                                 doxygen.doDockerCleanup()
-                                }
                             }
                         }
                     }
-                }
+                }            
                 stage('ARM') {
                     when { expression { return params.ARM } }
                     agent { label 'arm' }
@@ -154,7 +153,7 @@ pipeline {
                                 + " --name ${env.IROHA_REDIS_HOST}"
                                 + " --network=${env.IROHA_NETWORK}")
 
-                            docker.image("hyperledger/iroha-docker-develop:armv7-v1").inside(""
+                            docker.image("irohatest/iroha:develop").inside(""
                                 + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
                                 + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
                                 + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
