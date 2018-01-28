@@ -44,7 +44,7 @@ pipeline {
                     agent { label 'linux' }
                     when { expression { return params.Linux } }
                     steps {
-                        script {                            
+                        script {
                             def dockerize = load ".jenkinsci/dockerize.groovy"
 
                             sh "docker network create ${env.IROHA_NETWORK}"
@@ -123,6 +123,15 @@ pipeline {
                             //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
                             //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
                             archive(includes: 'build/bin/,compile_commands.json')
+                            }                            
+                        }
+                    }
+                    post {
+                        always {
+                            script {
+                                def doxygen = load ".jenkinsci/docker-cleanup.groovy"
+                                doxygen.doDockerCleanup()
+                                }
                             }
                         }
                     }
@@ -131,7 +140,7 @@ pipeline {
                     when { expression { return params.ARM } }
                     agent { label 'arm' }
                     steps {
-                        script {                            
+                        script {
                             def dockerize = load ".jenkinsci/dockerize.groovy"
 
                             sh "docker network create ${env.IROHA_NETWORK}"
@@ -201,7 +210,16 @@ pipeline {
                                 archive(includes: 'build/bin/,compile_commands.json')
                             }
                         }
-                    }                    
+                    }
+                    post {
+                        always {
+                            script {
+                                def doxygen = load ".jenkinsci/docker-cleanup.groovy"
+                                doxygen.doDockerCleanup()
+                                }
+                            }
+                        }
+                    }
                 }
                 stage('MacOS'){
                     when { expression { return  params.MacOS } }
@@ -295,17 +313,6 @@ pipeline {
                         doxygen.doDoxygen()
                     }
                 }
-            }
-        }
-    }
-    post {
-        always {
-            script {
-                sh """
-                  docker stop $IROHA_POSTGRES_HOST $IROHA_REDIS_HOST || true
-                  docker rm $IROHA_POSTGRES_HOST $IROHA_REDIS_HOST || true
-                  docker network rm $IROHA_NETWORK || true
-                """
             }
         }
     }
