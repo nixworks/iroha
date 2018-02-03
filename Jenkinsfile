@@ -26,6 +26,7 @@ pipeline {
         CODECOV_TOKEN = credentials('CODECOV_TOKEN')
         DOCKERHUB = credentials('DOCKERHUB')
         DOCKER_IMAGE = 'hyperledger/iroha-docker-develop:v1'
+        PLATFORM = "`uname -m`"
 
         IROHA_NETWORK = "iroha-${GIT_COMMIT}-${BUILD_NUMBER}"
         IROHA_POSTGRES_HOST = "pg-${GIT_COMMIT}-${BUILD_NUMBER}"
@@ -49,17 +50,25 @@ pipeline {
 
                             sh "docker network create ${env.IROHA_NETWORK}"
 
-                            def p_c = docker.image('postgres:9.5').run(""
+                            docker.image('postgres:9.5').run(""
                                 + " -e POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
                                 + " -e POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
                                 + " --name ${env.IROHA_POSTGRES_HOST}"
-                                + " --network=${env.IROHA_NETWORK}", 'while ! su - postgres /bin/bash -c pg_isready;do sleep 1;done')
+                                + " --network=${env.IROHA_NETWORK}")
 
-                            def r_c = docker.image('redis:3.2.8').run(""
+                            docker.image('redis:3.2.8').run(""
                                 + " --name ${env.IROHA_REDIS_HOST}"
-                                + " --network=${env.IROHA_NETWORK}", 'while [ "$(redis-cli PING)" != "PONG" ]; do sleep 1; done')
+                                + " --network=${env.IROHA_NETWORK}")
 
-                            docker.image("${env.DOCKER_IMAGE}").inside(""
+                            try {
+                                if (env.BRANCH_NAME == 'develop') {
+                                    def i_c = docker.build("hyperledger/iroha:develop", "-f ./docker/develop/${env.PLATFORM}/Dockerfile")
+                                }
+                                else {
+                                    def i_c = docker.build("hyperledger/iroha:workflow", "-f ./docker/develop/${env.PLATFORM}/Dockerfile")
+                                }
+
+                                i_c.inside(""
                                 + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
                                 + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
                                 + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
@@ -122,6 +131,10 @@ pipeline {
                                 //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
                                 //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
                                 //archive(includes: 'build/bin/,compile_commands.json')
+                            }
+                            }
+                            catch (all) {
+                                println 'Platform not supported. Aborting...'
                             }
                         }
                     }
@@ -251,7 +264,7 @@ pipeline {
                             sh "ccache --show-stats"
                             
                             // TODO: replace with upload to artifactory server
-                            archive(includes: 'build/bin/,compile_commands.json')
+                            //archive(includes: 'build/bin/,compile_commands.json')
                         }
                     }
                     post {
@@ -345,7 +358,7 @@ pipeline {
             steps {
                 script {
                     def doxygen = load ".jenkinsci/doxygen.groovy"
-                    docker.image("${env.DOCKER_IMAGE}").inside("") {
+                    docker.image("${env.DOCKER_IMAGE}").inside {
                         def scmVars = checkout scm
                         doxygen.doDoxygen()
                     }
