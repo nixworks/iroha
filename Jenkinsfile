@@ -12,7 +12,7 @@
 //   |            |----Release
 properties([parameters([
     choice(choices: 'Debug\nRelease', description: '', name: 'BUILD_TYPE'),
-    booleanParam(defaultValue: true, description: '', name: 'Linux'),
+    booleanParam(defaultValue: false, description: '', name: 'Linux'),
     booleanParam(defaultValue: true, description: '', name: 'ARM'),
     booleanParam(defaultValue: false, description: '', name: 'MacOS'),
     booleanParam(defaultValue: true, description: 'Whether we should build docs or not', name: 'Doxygen'),
@@ -49,86 +49,80 @@ pipeline {
 
                             sh "docker network create ${env.IROHA_NETWORK}"
 
-                            def p_c = docker.image('postgres:9.5').withRun(""
+                            def p_c = docker.image('postgres:9.5').run(""
                                 + " -e POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
                                 + " -e POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
                                 + " --name ${env.IROHA_POSTGRES_HOST}"
-                                + " --network=${env.IROHA_NETWORK}") {
-                                    docker.image('postgres:9.5').inside {
-                                        sh 'while ! su - postgres /bin/bash -c pg_isready;do sleep 1;done'
-                                    }
-                                    def r_c = docker.image('redis:3.2.8').withRun(""
-                                    + " --name ${env.IROHA_REDIS_HOST}"
-                                    + " --network=${env.IROHA_NETWORK}") {
-                                        def r_c = docker.image('redis:3.2.8').inside {
-                                            sh 'while [ "$(redis-cli PING)" != "PONG" ]; do sleep 1; done'
-                                        }
-                                        docker.image("${env.DOCKER_IMAGE}").inside(""
-                                        + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
-                                        + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
-                                        + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
-                                        + " -e IROHA_POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
-                                        + " -e IROHA_REDIS_HOST=${env.IROHA_REDIS_HOST}"
-                                        + " -e IROHA_REDIS_PORT=${env.IROHA_REDIS_PORT}"
-                                        + " --network=${env.IROHA_NETWORK}"
-                                        + " -v /var/jenkins/ccache:${CCACHE_DIR}") {
+                                + " --network=${env.IROHA_NETWORK}", 'while ! su - postgres /bin/bash -c pg_isready;do sleep 1;done')
 
-                                        def scmVars = checkout scm
-                                        env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
-                                        env.IROHA_HOME = "/opt/iroha"
-                                        env.IROHA_BUILD = "${env.IROHA_HOME}/build"
-                                        env.IROHA_RELEASE = "${env.IROHA_HOME}/docker/release"
+                            def r_c = docker.image('redis:3.2.8').run(""
+                                + " --name ${env.IROHA_REDIS_HOST}"
+                                + " --network=${env.IROHA_NETWORK}", 'while [ "$(redis-cli PING)" != "PONG" ]; do sleep 1; done')
 
-                                        sh """
-                                            ccache --version
-                                            ccache --show-stats
-                                            ccache --zero-stats
-                                            ccache --max-size=1G
-                                        """
-                                        sh """
-                                            cmake \
-                                              -DCOVERAGE=ON \
-                                              -DTESTING=ON \
-                                              -H. \
-                                              -Bbuild \
-                                              -DCMAKE_BUILD_TYPE=${params.BUILD_TYPE} \
-                                              -DIROHA_VERSION=${env.IROHA_VERSION}
-                                        """
-                                        sh "cmake --build build -- -j${params.PARALLELISM}"
-                                        sh "ccache --cleanup"
-                                        sh "ccache --show-stats"
+                            docker.image("${env.DOCKER_IMAGE}").inside(""
+                                + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
+                                + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
+                                + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
+                                + " -e IROHA_POSTGRES_PASSWORD=${env.IROHA_POSTGRES_PASSWORD}"
+                                + " -e IROHA_REDIS_HOST=${env.IROHA_REDIS_HOST}"
+                                + " -e IROHA_REDIS_PORT=${env.IROHA_REDIS_PORT}"
+                                + " --network=${env.IROHA_NETWORK}"
+                                + " -v /var/jenkins/ccache:${CCACHE_DIR}") {
 
-                                        sh "cmake --build build --target test"
-                                        sh "cmake --build build --target gcovr"
-                                        sh "cmake --build build --target cppcheck"
+                                def scmVars = checkout scm
+                                env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
+                                env.IROHA_HOME = "/opt/iroha"
+                                env.IROHA_BUILD = "${env.IROHA_HOME}/build"
+                                env.IROHA_RELEASE = "${env.IROHA_HOME}/docker/release"
 
-                                        if ( env.BRANCH_NAME == "master" ||
-                                             env.BRANCH_NAME == "develop" ) {
-                                            dockerize.doDockerize()
-                                        }
-                                        
-                                        // Codecov
-                                        sh "bash <(curl -s https://codecov.io/bash) -f build/reports/gcovr.xml -t ${CODECOV_TOKEN} || echo 'Codecov did not collect coverage reports'"
+                                sh """
+                                    ccache --version
+                                    ccache --show-stats
+                                    ccache --zero-stats
+                                    ccache --max-size=1G
+                                """
+                                sh """
+                                    cmake \
+                                      -DCOVERAGE=ON \
+                                      -DTESTING=ON \
+                                      -H. \
+                                      -Bbuild \
+                                      -DCMAKE_BUILD_TYPE=${params.BUILD_TYPE} \
+                                      -DIROHA_VERSION=${env.IROHA_VERSION}
+                                """
+                                sh "cmake --build build -- -j${params.PARALLELISM}"
+                                sh "ccache --cleanup"
+                                sh "ccache --show-stats"
 
-                                        // Sonar
-                                        if (env.CHANGE_ID != null) {
-                                            sh """
-                                                sonar-scanner \
-                                                    -Dsonar.github.disableInlineComments \
-                                                    -Dsonar.github.repository='hyperledger/iroha' \
-                                                    -Dsonar.analysis.mode=preview \
-                                                    -Dsonar.login=${SONAR_TOKEN} \
-                                                    -Dsonar.projectVersion=${BUILD_TAG} \
-                                                    -Dsonar.github.oauth=${SORABOT_TOKEN} \
-                                                    -Dsonar.github.pullRequest=${CHANGE_ID}
-                                            """
-                                        }
-                                        //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
-                                        //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
-                                        //archive(includes: 'build/bin/,compile_commands.json')
-                                    }
+                                sh "cmake --build build --target test"
+                                sh "cmake --build build --target gcovr"
+                                sh "cmake --build build --target cppcheck"
+
+                                if ( env.BRANCH_NAME == "master" ||
+                                     env.BRANCH_NAME == "develop" ) {
+                                    dockerize.doDockerize()
                                 }
-                            } 
+                                
+                                // Codecov
+                                sh "bash <(curl -s https://codecov.io/bash) -f build/reports/gcovr.xml -t ${CODECOV_TOKEN} || echo 'Codecov did not collect coverage reports'"
+
+                                // Sonar
+                                if (env.CHANGE_ID != null) {
+                                    sh """
+                                        sonar-scanner \
+                                            -Dsonar.github.disableInlineComments \
+                                            -Dsonar.github.repository='hyperledger/iroha' \
+                                            -Dsonar.analysis.mode=preview \
+                                            -Dsonar.login=${SONAR_TOKEN} \
+                                            -Dsonar.projectVersion=${BUILD_TAG} \
+                                            -Dsonar.github.oauth=${SORABOT_TOKEN} \
+                                            -Dsonar.github.pullRequest=${CHANGE_ID}
+                                    """
+                                }
+                                //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
+                                //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
+                                //archive(includes: 'build/bin/,compile_commands.json')
+                            }
                         }
                     }
                     post {
