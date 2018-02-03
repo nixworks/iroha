@@ -26,7 +26,6 @@ pipeline {
         CODECOV_TOKEN = credentials('CODECOV_TOKEN')
         DOCKERHUB = credentials('DOCKERHUB')
         DOCKER_IMAGE = 'hyperledger/iroha-docker-develop:v1'
-        PLATFORM = "`uname -m`"
 
         IROHA_NETWORK = "iroha-${GIT_COMMIT}-${BUILD_NUMBER}"
         IROHA_POSTGRES_HOST = "pg-${GIT_COMMIT}-${BUILD_NUMBER}"
@@ -62,10 +61,10 @@ pipeline {
 
                             try {
                                 if (env.BRANCH_NAME == 'develop') {
-                                    def i_c = docker.build("hyperledger/iroha:develop", "-f ./docker/develop/${env.PLATFORM}/Dockerfile")
+                                    def i_c = docker.build("hyperledger/iroha:develop", "-f ./docker/develop/`uname -m`/Dockerfile", ".")
                                 }
                                 else {
-                                    def i_c = docker.build("hyperledger/iroha:workflow", "-f ./docker/develop/${env.PLATFORM}/Dockerfile")
+                                    def i_c = docker.build("hyperledger/iroha:workflow", "-f ./docker/develop/`uname -m`/Dockerfile", ".")
                                 }
 
                                 i_c.inside(""
