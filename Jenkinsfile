@@ -16,7 +16,7 @@ properties([parameters([
     booleanParam(defaultValue: true, description: '', name: 'ARM'),
     booleanParam(defaultValue: false, description: '', name: 'MacOS'),
     booleanParam(defaultValue: true, description: 'Whether we should build docs or not', name: 'Doxygen'),
-    string(defaultValue: '2', description: 'How much parallelism should we exploit. "4" is optimal for machines with modest amount of memory and at least 4 cores', name: 'PARALLELISM')]),
+    string(defaultValue: '4', description: 'How much parallelism should we exploit. "4" is optimal for machines with modest amount of memory and at least 4 cores', name: 'PARALLELISM')]),
     pipelineTriggers([cron('@weekly')])])
 pipeline {
     environment {
@@ -72,7 +72,7 @@ pipeline {
                                 def scmVars = checkout scm
                                 env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
                                 env.IROHA_HOME = "/opt/iroha"
-                                env.IROHA_BUILD = "/opt/iroha/build"
+                                env.IROHA_BUILD = "${env.IROHA_HOME}/build"
                                 env.IROHA_RELEASE = "${env.IROHA_HOME}/docker/release"
 
                                 sh """
@@ -121,15 +121,16 @@ pipeline {
                                 }
                                 //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
                                 //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
-                                archive(includes: 'build/bin/,compile_commands.json')
+                                //archive(includes: 'build/bin/,compile_commands.json')
                             }
                         }
                     }
                     post {
                         always {
                             script {
-                                def doxygen = load ".jenkinsci/docker-cleanup.groovy"
-                                doxygen.doDockerCleanup()
+                                def cleanup = load ".jenkinsci/docker-cleanup.groovy"
+                                cleanup.doCleanup()
+                                cleanWs()
                             }
                         }
                     }
@@ -166,7 +167,7 @@ pipeline {
                                 def scmVars = checkout scm
                                 env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
                                 env.IROHA_HOME = "/opt/iroha"
-                                env.IROHA_BUILD = "/opt/iroha/build"
+                                env.IROHA_BUILD = "${env.IROHA_HOME}/build"
                                 env.IROHA_RELEASE = "${env.IROHA_HOME}/docker/release"
 
                                 sh """
@@ -212,16 +213,53 @@ pipeline {
                     post {
                         always {
                             script {
-                                def doxygen = load ".jenkinsci/docker-cleanup.groovy"
-                                doxygen.doDockerCleanup()
+                                def cleanup = load ".jenkinsci/docker-cleanup.groovy"
+                                cleanup.doCleanup()
+                                cleanWs()
                             }
                         }
                     }
                 }
                 stage('MacOS'){
                     when { expression { return  params.MacOS } }
+                    agent { label 'mac' }
                     steps {
-                        sh "MacOS build will be running there"
+                        script {
+                            def scmVars = checkout scm
+                            env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
+                            env.IROHA_HOME = "/opt/iroha"
+                            env.IROHA_BUILD = "${env.IROHA_HOME}/build"
+                            env.CCACHE_DIR = "${env.IROHA_HOME}/.ccache"
+
+                            sh """
+                                ccache --version
+                                ccache --show-stats
+                                ccache --zero-stats
+                                ccache --max-size=1G
+                            """
+                            sh """
+                                cmake \
+                                  -DCOVERAGE=ON \
+                                  -DTESTING=ON \
+                                  -H. \
+                                  -Bbuild \
+                                  -DCMAKE_BUILD_TYPE=${params.BUILD_TYPE} \
+                                  -DIROHA_VERSION=${env.IROHA_VERSION}
+                            """
+                            sh "cmake --build build -- -j${params.PARALLELISM}"
+                            sh "ccache --cleanup"
+                            sh "ccache --show-stats"
+                            
+                            // TODO: replace with upload to artifactory server
+                            archive(includes: 'build/bin/,compile_commands.json')
+                        }
+                    }
+                    post {
+                        always {
+                            script {
+                                cleanWs()
+                            }
+                        }
                     }
                 }
             }
