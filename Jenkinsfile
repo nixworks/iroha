@@ -12,12 +12,12 @@
 //   |            |----Release
 properties([parameters([
     choice(choices: 'Debug\nRelease', description: '', name: 'BUILD_TYPE'),
-    booleanParam(defaultValue: false, description: '', name: 'Linux'),
-    booleanParam(defaultValue: true, description: '', name: 'ARM'),
+    booleanParam(defaultValue: true, description: '', name: 'Linux'),
+    booleanParam(defaultValue: false, description: '', name: 'ARM'),
     booleanParam(defaultValue: false, description: '', name: 'MacOS'),
     booleanParam(defaultValue: true, description: 'Whether we should build docs or not', name: 'Doxygen'),
     string(defaultValue: '4', description: 'How much parallelism should we exploit. "4" is optimal for machines with modest amount of memory and at least 4 cores', name: 'PARALLELISM')]),
-    pipelineTriggers([cron('@weekly')])])
+    pipelineTriggers([cron('@daily')])])
 pipeline {
     environment {
         CCACHE_DIR = '/opt/.ccache'
@@ -26,6 +26,8 @@ pipeline {
         CODECOV_TOKEN = credentials('CODECOV_TOKEN')
         DOCKERHUB = credentials('DOCKERHUB')
         DOCKER_IMAGE = 'hyperledger/iroha-docker-develop:v1'
+        DOCKER_BASE_IMAGE_DEVELOP = 'hyperledger/iroha-docker-develop:v1'
+        DOCKER_BASE_IMAGE_RELEASE = 'hyperledger/iroha-docker'
 
         IROHA_NETWORK = "iroha-${GIT_COMMIT}-${BUILD_NUMBER}"
         IROHA_POSTGRES_HOST = "pg-${GIT_COMMIT}-${BUILD_NUMBER}"
@@ -40,12 +42,16 @@ pipeline {
         stage('Build Debug') {
             when { expression { params.BUILD_TYPE == 'Debug' } }
             parallel {
-                stage ('Linux') {
-                    agent { label 'linux' }
+                stage ('Linux') {                    
                     when { expression { return params.Linux } }
+                    agent { label 'linux && x86_64' }
                     steps {
                         script {
                             def dockerize = load ".jenkinsci/dockerize.groovy"
+
+                            // Stop same job running builds if any
+                            def builds = load ".jenkinsci/cancel-builds-same-job.groovy"
+                            builds.cancelSameCommitBuilds()
 
                             sh "docker network create ${env.IROHA_NETWORK}"
 
@@ -59,15 +65,21 @@ pipeline {
                                 + " --name ${env.IROHA_REDIS_HOST}"
                                 + " --network=${env.IROHA_NETWORK}")
 
-                            try {
-                                if (env.BRANCH_NAME == 'develop') {
-                                    def i_c = docker.build("hyperledger/iroha:develop", "-f ./docker/develop/`uname -m`/Dockerfile", ".")
-                                }
-                                else {
-                                    def i_c = docker.build("hyperledger/iroha:workflow", "-f ./docker/develop/`uname -m`/Dockerfile", ".")
-                                }
-
-                                i_c.inside(""
+                            def platform = sh(script: 'uname -m', returnStdout: true).trim()
+                            // TODO: replace Github pull path as soon as multiplatform support will be merged
+                            sh "curl -L -o /tmp/${env.GIT_COMMIT}/Dockerfile --create-dirs https://raw.githubusercontent.com/hyperledger/iroha/${env.GIT_COMMIT}/docker/develop/${platform}/Dockerfile"
+                            // pull docker image in case we don't have one
+                            // speeds up consequent image builds as we simply tag them 
+                            sh "docker pull ${DOCKER_BASE_IMAGE_DEVELOP}"
+                            if (env.BRANCH_NAME == 'develop') {
+                                iC = docker.build("hyperledger/iroha:develop-${GIT_COMMIT}-${BUILD_NUMBER}", "-f /tmp/${env.GIT_COMMIT}/Dockerfile /tmp/${env.GIT_COMMIT}")
+                                // TODO: push image with `develop` tag
+                            }
+                            else {
+                                iC = docker.build("hyperledger/iroha:workflow-${GIT_COMMIT}-${BUILD_NUMBER}", "-f /tmp/${env.GIT_COMMIT}/Dockerfile /tmp/${env.GIT_COMMIT}")
+                            }
+                            sh "rm -rf /tmp/${env.GIT_COMMIT}"
+                            iC.inside(""
                                 + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
                                 + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
                                 + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
@@ -129,11 +141,7 @@ pipeline {
                                 }
                                 //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
                                 //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
-                                //archive(includes: 'build/bin/,compile_commands.json')
-                            }
-                            }
-                            catch (all) {
-                                println 'Platform not supported. Aborting...'
+                                //archive(includes: 'build/bin/,compile_commands.json')                            
                             }
                         }
                     }
@@ -153,6 +161,10 @@ pipeline {
                     steps {
                         script {
                             def dockerize = load ".jenkinsci/dockerize.groovy"
+                            
+                            // Stop same job running builds if any
+                            def builds = load ".jenkinsci/cancel-builds-same-job.groovy"
+                            builds.cancelSameCommitBuilds()
 
                             sh "docker network create ${env.IROHA_NETWORK}"
 
@@ -166,7 +178,22 @@ pipeline {
                                 + " --name ${env.IROHA_REDIS_HOST}"
                                 + " --network=${env.IROHA_NETWORK}")
 
-                            docker.image("irohatest/iroha:develop").inside(""
+                            def platform = sh(script: 'uname -m', returnStdout: true).trim()
+                            // TODO: replace Github pull path as soon as multiplatform support will be merged
+                            sh "curl -L -o /tmp/${env.GIT_COMMIT}/Dockerfile --create-dirs https://raw.githubusercontent.com/hyperledger/iroha/${env.GIT_COMMIT}/docker/develop/${platform}/Dockerfile"
+                            // pull docker image in case we don't have one
+                            // speeds up consequent image builds as we simply tag them 
+                            sh "docker pull ${DOCKER_BASE_IMAGE_DEVELOP}"
+                            if (env.BRANCH_NAME == 'develop') {
+                                iC = docker.build("hyperledger/iroha:develop-${GIT_COMMIT}-${BUILD_NUMBER}", "-f /tmp/${env.GIT_COMMIT}/Dockerfile /tmp/${env.GIT_COMMIT}")
+                                // TODO: push image with `develop` tag
+                            }
+                            else {
+                                iC = docker.build("hyperledger/iroha:workflow-${GIT_COMMIT}-${BUILD_NUMBER}", "-f /tmp/${env.GIT_COMMIT}/Dockerfile /tmp/${env.GIT_COMMIT}")
+                            }
+                            sh "rm -rf /tmp/${env.GIT_COMMIT}"
+
+                            iC.inside(""
                                 + " -e IROHA_POSTGRES_HOST=${env.IROHA_POSTGRES_HOST}"
                                 + " -e IROHA_POSTGRES_PORT=${env.IROHA_POSTGRES_PORT}"
                                 + " -e IROHA_POSTGRES_USER=${env.IROHA_POSTGRES_USER}"
@@ -174,7 +201,7 @@ pipeline {
                                 + " -e IROHA_REDIS_HOST=${env.IROHA_REDIS_HOST}"
                                 + " -e IROHA_REDIS_PORT=${env.IROHA_REDIS_PORT}"
                                 + " --network=${env.IROHA_NETWORK}"
-                                + " -v /var/jenkins/ccache-arm:${CCACHE_DIR}") {
+                                + " -v /var/jenkins/ccache:${CCACHE_DIR}") {
 
                                 def scmVars = checkout scm
                                 env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
@@ -218,7 +245,7 @@ pipeline {
 
                                 //stash(allowEmpty: true, includes: 'build/compile_commands.json', name: 'Compile commands')
                                 //stash(allowEmpty: true, includes: 'build/reports/', name: 'Reports')
-                                archive(includes: 'build/bin/,compile_commands.json')
+                                //archive(includes: 'build/bin/,compile_commands.json')
                             }
                         }
                     }
@@ -283,6 +310,8 @@ pipeline {
                     when { expression { return params.Linux } }
                     steps {
                         script {
+                            // TODO: pull base image release
+                            //sh "docker pull ${DOCKER_BASE_IMAGE_RELEASE}"
                             def scmVars = checkout scm
                             env.IROHA_VERSION = "0x${scmVars.GIT_COMMIT}"
                         }

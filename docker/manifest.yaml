@@ -2,24 +2,18 @@
 image: hyperledger/iroha:latest
 manifests:
   -
-    image: hyperledger/iroha:amd64
+    image: hyperledger/iroha:x86_64
     platform:
       architecture: amd64
       os: linux
       features:
         - sse
   -
-    image: hyperledger/iroha:arm
+    image: hyperledger/iroha:armv7l
     platform:
       architecture: arm
       os: linux
-  -
-    image: hyperledger/iroha:amd64
-    platform:
-      architecture: amd64
-      os: darwin
-      features:
-        - sse
+      variant: v7
 
 # develop branch
 image: hyperledger/iroha:develop
@@ -32,13 +26,8 @@ manifests:
       features:
         - sse
   -
-    image: hyperledger/iroha-develop:arm
+    image: hyperledger/iroha-develop:armv7l
     platform:
       architecture: arm
       os: linux
-  -
-    image: hyperledger/iroha-develop:amd64
-    platform:
-      architecture: amd64
-      os: darwin
-
+      variant: v7
