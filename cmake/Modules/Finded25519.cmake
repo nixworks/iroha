@@ -12,7 +12,7 @@ find_package_handle_standard_args(ed25519 DEFAULT_MSG
     )
 
 set(URL https://github.com/warchant/ed25519.git)
-set(VERSION 56d926c4489aa7b2bb664a48294c5ee2d6e1c283)
+set(VERSION 6b4779f737d72038c716d0ecbc0701411dff083e)
 set_target_description(ed25519 "Digital signature algorithm" ${URL} ${VERSION})
 
 if (NOT ed25519_FOUND)

@@ -34,7 +34,10 @@ if (NOT nudb_FOUND)
     externalproject_add(warchant_nudb
             GIT_REPOSITORY ${URL}
             GIT_TAG        ${VERSION}
-            GIT_SUBMODULES "doc/docca" # disable submodules.
+            # GIT_SUBMODULES accepts a list of paths to submodules, which we want to download.
+            # If empty, all submodules are downloaded. There is no way to disable downloading of all dependencies,
+            # therefore I put one "the lightest" dependency here.
+            GIT_SUBMODULES "doc/docca"
             CMAKE_ARGS     -DBoost_NO_SYSTEM_PATHS=OFF
             CONFIGURE_COMMAND "" # remove configure step
             BUILD_COMMAND     "" # remove build step

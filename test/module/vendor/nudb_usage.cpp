@@ -22,9 +22,8 @@ auto const dat_path = "/tmp/tezt_db.dat";
 auto const key_path = "/tmp/tezt_db.key";
 auto const log_path = "/tmp/tezt_db.log";
 
-class NuDB: public ::testing::Test {
+class NuDB : public ::testing::Test {
  public:
-
   void TearDown() override {
     nudb::erase_file(dat_path);
     nudb::erase_file(key_path);
@@ -101,7 +100,9 @@ TEST_F(NuDB, CRUD) {
                ASSERT_EQ(size, 0) << "size is " << size;
              },
              ec);
-    if (ec) {
+    if (ec == nudb::error::key_not_found) {
+      SUCCEED();
+    } else if (ec) {
       FAIL() << "failed during reading of non-existent key: " << ec.message();
     }
   }

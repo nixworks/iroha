@@ -26,9 +26,9 @@
 #include <cpp_redis/cpp_redis>
 #include <nonstd/optional.hpp>
 #include <pqxx/pqxx>
+#include "ametsuchi/impl/block_storage.hpp"
 #include "logger/logger.hpp"
 #include "model/converters/json_block_factory.hpp"
-#include "ametsuchi/impl/block_storage_nudb.hpp"
 
 namespace iroha {
   namespace ametsuchi {
@@ -37,11 +37,7 @@ namespace iroha {
       ConnectionContext(std::unique_ptr<BlockStorage> block_store,
                         std::unique_ptr<cpp_redis::client> index,
                         std::unique_ptr<pqxx::lazyconnection> pg_lazy,
-                        std::unique_ptr<pqxx::nontransaction> pg_nontx)
-          : block_store(std::move(block_store)),
-            index(std::move(index)),
-            pg_lazy(std::move(pg_lazy)),
-            pg_nontx(std::move(pg_nontx)) {}
+                        std::unique_ptr<pqxx::nontransaction> pg_nontx);
 
       std::unique_ptr<BlockStorage> block_store;
       std::unique_ptr<cpp_redis::client> index;

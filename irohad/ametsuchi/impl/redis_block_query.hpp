@@ -33,7 +33,7 @@ namespace iroha {
      */
     class RedisBlockQuery : public BlockQuery {
      public:
-      RedisBlockQuery(cpp_redis::client &client, BlockStorage &file_store);
+      RedisBlockQuery(cpp_redis::client &client, BlockStorage &bs);
 
       rxcpp::observable<model::Transaction> getAccountTransactions(
           const std::string &account_id) override;
